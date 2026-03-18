@@ -254,6 +254,9 @@ private:
     void openStreamMediaFileDlg();
     void startStreamMediaFile();
     void stopStreamMediaFile();
+    bool advanceMediaQueue();
+    void slotMediaQueueNext();
+    void slotMediaQueuePrev();
     void changeMediaFileOffset(int pos);
     void changeMediaFileVolume(int pos);
     void setMediaFilePosition();
@@ -484,6 +487,8 @@ private:
     MediaFilePlayback m_mfp = {};
     VideoCodec m_mfp_videocodec = {};
     std::optional<MediaFileInfo> m_mfi;
+    QStringList m_mediaQueue;
+    int m_mediaQueueIndex = 0;
 
 signals:
     /* Begin - CLIENTEVENT_* based events */

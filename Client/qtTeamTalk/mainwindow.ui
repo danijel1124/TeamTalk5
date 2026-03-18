@@ -561,6 +561,32 @@
             </widget>
            </item>
            <item>
+            <widget class="QToolButton" name="prevMediaFileButton">
+             <property name="toolTip">
+              <string>Previous track (Alt+Shift+Left)</string>
+             </property>
+             <property name="accessibleName">
+              <string>Previous track</string>
+             </property>
+             <property name="text">
+              <string>|&lt;</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QToolButton" name="nextMediaFileButton">
+             <property name="toolTip">
+              <string>Next track (Alt+Shift+Right)</string>
+             </property>
+             <property name="accessibleName">
+              <string>Next track</string>
+             </property>
+             <property name="text">
+              <string>&gt;|</string>
+             </property>
+            </widget>
+           </item>
+           <item>
             <widget class="QToolButton" name="openMediaFileButton">
              <property name="toolTip">
               <string>Browse</string>

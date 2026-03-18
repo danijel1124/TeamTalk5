@@ -22,6 +22,9 @@
 
 #include "common.h"
 
+#include <QStringList>
+#include <QTimer>
+
 class StreamMediaFileDlg : public QDialog
 {
     Q_OBJECT
@@ -29,7 +32,9 @@ class StreamMediaFileDlg : public QDialog
 public:
     StreamMediaFileDlg(QWidget* parent = nullptr);
     ~StreamMediaFileDlg();
-    
+
+    QStringList getQueue() const;
+
 public:
     void slotMediaStreamProgress(const MediaFileInfo& mfi);
     void slotMediaPlaybackProgress(int sessionid, const MediaFileInfo& mfi);
@@ -47,8 +52,14 @@ private:
     void slotPlayMediaFile();
     void slotStopMediaFile();
     void slotChangePlayOffset(int);
+    void slotDoSeek();
     void slotChangePreprocessor(int);
     void slotSetupPreprocessor(bool);
+
+    void slotAddToQueue();
+    void slotRemoveFromQueue();
+    void slotMoveQueueUp();
+    void slotMoveQueueDown();
 
 protected:
     bool eventFilter(QObject *object, QEvent *event);
@@ -60,6 +71,7 @@ private:
     VideoCodec m_videocodec = {};
     int m_playbackid = 0;
     bool m_progressupdate = false;
+    QTimer m_seekTimer;
 };
 
 #endif

@@ -68,6 +68,7 @@
 #include <QNetworkReply>
 #include <QGuiApplication>
 #include <QKeyEvent>
+#include <QShortcut>
 #include <QCloseEvent>
 #include <QClipboard>
 #include <QSysInfo>
@@ -308,8 +309,15 @@ MainWindow::MainWindow(const QString& cfgfile)
     });
     connect(ui.stopMediaFileButton, &QAbstractButton::clicked, this,
             &MainWindow::stopStreamMediaFile);
+    connect(ui.prevMediaFileButton, &QAbstractButton::clicked, this, &MainWindow::slotMediaQueuePrev);
+    connect(ui.nextMediaFileButton, &QAbstractButton::clicked, this, &MainWindow::slotMediaQueueNext);
     connect(ui.openMediaFileButton, &QAbstractButton::clicked, this, &MainWindow::openStreamMediaFileDlg);
     connect(ui.mediaVolumeSlider, &QSlider::sliderMoved, this, &MainWindow::changeMediaFileVolume);
+
+    auto* scNext = new QShortcut(QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_Right), this);
+    connect(scNext, &QShortcut::activated, this, &MainWindow::slotMediaQueueNext);
+    auto* scPrev = new QShortcut(QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_Left), this);
+    connect(scPrev, &QShortcut::activated, this, &MainWindow::slotMediaQueuePrev);
 
     /* Files-tab */
     connect(ui.uploadButton, &QAbstractButton::clicked, this, &MainWindow::slotChannelsUploadFile);
@@ -1472,8 +1480,15 @@ void MainWindow::clienteventStreamMediaFile(const MediaFileInfo& mediafileinfo)
         addStatusMsg(STATUSBAR_BYPASS, tr("Finished streaming media file to channel"));
         stopStreamMediaFile();
 
-        if (ttSettings->value(SETTINGS_STREAMMEDIA_LOOP, SETTINGS_STREAMMEDIA_LOOP_DEFAULT).toBool())
+        if (advanceMediaQueue())
             startStreamMediaFile();
+        else
+        {
+            m_mediaQueue.clear();
+            m_mediaQueueIndex = 0;
+            if (ttSettings->value(SETTINGS_STREAMMEDIA_LOOP, SETTINGS_STREAMMEDIA_LOOP_DEFAULT).toBool())
+                startStreamMediaFile();
+        }
         break;
     case MFS_ABORTED :
         addStatusMsg(STATUSBAR_BYPASS, tr("Aborted streaming media file to channel"));
@@ -5516,13 +5531,20 @@ void MainWindow::openStreamMediaFileDlg()
         return;
     }
 
+    m_mediaQueue = dlg.getQueue();
+    m_mediaQueueIndex = 0;
+
     stopStreamMediaFile();
     startStreamMediaFile();
 }
 
 void MainWindow::startStreamMediaFile()
 {
-    QString fileName = ttSettings->value(QString(SETTINGS_STREAMMEDIA_FILENAME).arg(0)).toString();
+    QString fileName;
+    if (!m_mediaQueue.isEmpty())
+        fileName = m_mediaQueue.at(m_mediaQueueIndex);
+    else
+        fileName = ttSettings->value(QString(SETTINGS_STREAMMEDIA_FILENAME).arg(0)).toString();
 #if defined(Q_OS_WINDOWS)
     fileName = fileName.remove('"');
 #endif
@@ -5598,6 +5620,38 @@ void MainWindow::stopStreamMediaFile()
 
     slotUpdateUI();
     slotUpdateMediaTabUI();
+}
+
+bool MainWindow::advanceMediaQueue()
+{
+    if (m_mediaQueue.isEmpty())
+        return false;
+    if (m_mediaQueueIndex + 1 >= m_mediaQueue.size())
+        return false;
+    m_mediaQueueIndex++;
+    return true;
+}
+
+void MainWindow::slotMediaQueueNext()
+{
+    if (m_mediaQueue.isEmpty() || !isMyselfStreaming())
+        return;
+    if (m_mediaQueueIndex + 1 >= m_mediaQueue.size())
+        return;
+    m_mediaQueueIndex++;
+    stopStreamMediaFile();
+    startStreamMediaFile();
+}
+
+void MainWindow::slotMediaQueuePrev()
+{
+    if (m_mediaQueue.isEmpty() || !isMyselfStreaming())
+        return;
+    if (m_mediaQueueIndex <= 0)
+        return;
+    m_mediaQueueIndex--;
+    stopStreamMediaFile();
+    startStreamMediaFile();
 }
 
 void MainWindow::slotPauseResumeStream()
