@@ -27,6 +27,7 @@
 #include <QMessageBox>
 #include <QComboBox>
 #include <QKeyEvent>
+#include <QListWidget>
 
 extern NonDefaultSettings* ttSettings;
 extern TTInstance* ttInst;
@@ -56,7 +57,16 @@ StreamMediaFileDlg::StreamMediaFileDlg(QWidget* parent/* = 0*/)
 #endif
     connect(ui.preprocessorComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &StreamMediaFileDlg::slotChangePreprocessor);
     connect(ui.preprocessButton, &QAbstractButton::clicked, this, &StreamMediaFileDlg::slotSetupPreprocessor);
-    connect(ui.playbackOffsetSlider, &QSlider::sliderMoved, this, &StreamMediaFileDlg::slotChangePlayOffset);
+    connect(ui.playbackOffsetSlider, &QSlider::valueChanged, this, &StreamMediaFileDlg::slotChangePlayOffset);
+
+    m_seekTimer.setSingleShot(true);
+    m_seekTimer.setInterval(300);
+    connect(&m_seekTimer, &QTimer::timeout, this, &StreamMediaFileDlg::slotDoSeek);
+
+    connect(ui.addQueueBtn, &QPushButton::clicked, this, &StreamMediaFileDlg::slotAddToQueue);
+    connect(ui.removeQueueBtn, &QPushButton::clicked, this, &StreamMediaFileDlg::slotRemoveFromQueue);
+    connect(ui.moveUpQueueBtn, &QPushButton::clicked, this, &StreamMediaFileDlg::slotMoveQueueUp);
+    connect(ui.moveDownQueueBtn, &QPushButton::clicked, this, &StreamMediaFileDlg::slotMoveQueueDown);
 
     // audio preprocessor
     ui.preprocessorComboBox->addItem(tr("No Audio Preprocessor"), NO_AUDIOPREPROCESSOR);
@@ -131,16 +141,21 @@ void StreamMediaFileDlg::slotSelectFile()
 {
     QFileInfo fileinfo(QDir::fromNativeSeparators(ui.mediafileComboBox->lineEdit()->text()));
 
-    QString fileName = QFileDialog::getOpenFileName(this,
+    QStringList fileNames = QFileDialog::getOpenFileNames(this,
                         tr("Open Media File"),
                         QDir::toNativeSeparators(fileinfo.dir().absolutePath()),
                         tr("Media files %1").arg("(*.*)"));
-    if(fileName.size())
-    {
-        fileName = QDir::toNativeSeparators(fileName);
-        ui.mediafileComboBox->insertItem(0, fileName);
-        ui.mediafileComboBox->setCurrentIndex(0); // generates showMediaFormatInfo()
-    }
+    if (fileNames.isEmpty())
+        return;
+
+    // First file goes into the combobox as usual
+    QString first = QDir::toNativeSeparators(fileNames.first());
+    ui.mediafileComboBox->insertItem(0, first);
+    ui.mediafileComboBox->setCurrentIndex(0); // generates showMediaFormatInfo()
+
+    // All selected files go into the queue
+    for (const QString& f : fileNames)
+        ui.queueListWidget->addItem(QDir::toNativeSeparators(f));
 }
 
 void StreamMediaFileDlg::slotDeleteFromHistory()
@@ -297,21 +312,24 @@ void StreamMediaFileDlg::slotStopMediaFile()
 
 void StreamMediaFileDlg::slotChangePlayOffset(int value)
 {
-    double percent = value / double(ui.playbackOffsetSlider->maximum());
-    quint32 remain = m_mediaFile.uDurationMSec;
+    if (m_progressupdate)
+        return;
 
-    remain = quint32(remain * percent);
+    double percent = value / double(ui.playbackOffsetSlider->maximum());
+    quint32 remain = quint32(m_mediaFile.uDurationMSec * percent);
 
     updateProgress(remain, false);
 
     m_mfp.uOffsetMSec = UINT32(m_mediaFile.uDurationMSec * percent);
 
-    if (m_progressupdate)
-        return;
+    m_seekTimer.start();
+}
 
+void StreamMediaFileDlg::slotDoSeek()
+{
     if (m_playbackid > 0)
     {
-        if(!TT_UpdateLocalPlayback(ttInst, m_playbackid, &m_mfp))
+        if (!TT_UpdateLocalPlayback(ttInst, m_playbackid, &m_mfp))
         {
             QMessageBox::critical(this, tr("Play"), tr("Failed to play media file"));
             slotStopMediaFile();
@@ -418,6 +436,49 @@ void StreamMediaFileDlg::slotMediaPlaybackProgress(int sessionid, const MediaFil
     }
 
     m_progressupdate = false;
+}
+
+QStringList StreamMediaFileDlg::getQueue() const
+{
+    QStringList result;
+    for (int i = 0; i < ui.queueListWidget->count(); i++)
+        result << ui.queueListWidget->item(i)->text();
+    return result;
+}
+
+void StreamMediaFileDlg::slotAddToQueue()
+{
+    QString filename = ui.mediafileComboBox->lineEdit()->text();
+    if (filename.isEmpty())
+        return;
+    ui.queueListWidget->addItem(filename);
+}
+
+void StreamMediaFileDlg::slotRemoveFromQueue()
+{
+    int row = ui.queueListWidget->currentRow();
+    if (row >= 0)
+        delete ui.queueListWidget->takeItem(row);
+}
+
+void StreamMediaFileDlg::slotMoveQueueUp()
+{
+    int row = ui.queueListWidget->currentRow();
+    if (row <= 0)
+        return;
+    QListWidgetItem* item = ui.queueListWidget->takeItem(row);
+    ui.queueListWidget->insertItem(row - 1, item);
+    ui.queueListWidget->setCurrentRow(row - 1);
+}
+
+void StreamMediaFileDlg::slotMoveQueueDown()
+{
+    int row = ui.queueListWidget->currentRow();
+    if (row < 0 || row >= ui.queueListWidget->count() - 1)
+        return;
+    QListWidgetItem* item = ui.queueListWidget->takeItem(row);
+    ui.queueListWidget->insertItem(row + 1, item);
+    ui.queueListWidget->setCurrentRow(row + 1);
 }
 
 bool StreamMediaFileDlg::eventFilter(QObject *object, QEvent *event)
