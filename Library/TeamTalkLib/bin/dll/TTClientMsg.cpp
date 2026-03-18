@@ -24,6 +24,7 @@
 #include "TTClientMsg.h"
 
 #include "Convert.h"
+#include "TTStrConvert.h"
 #include "TeamTalkDefs.h"
 #include "teamtalk/TTAssert.h"
 
@@ -144,7 +145,7 @@ void TTMsgQueue::EnqueueMsg(ACE_Message_Block* mb)
                                              0, __CLIENTERRORMSG);
             msg->clienterrmsg->nErrorNo = INTERR_TTMESSAGE_QUEUE_OVERFLOW;
 
-            ACE_OS::strsncpy(msg->clienterrmsg->szErrorMsg,
+            A2TT(msg->clienterrmsg->szErrorMsg,
                              ACE_TEXT("The internal message queue has overflowed"),
                              TT_STRLEN);
 
@@ -272,7 +273,7 @@ void TTMsgQueue::OnEncryptionFailed(int sslerr, const ACE_TString& errmsg)
     ACE_UNUSED_ARG(msg);
     msg->clienterrmsg->nErrorNo = sslerr;
 
-    ACE_OS::strsncpy(msg->clienterrmsg->szErrorMsg,
+    A2TT(msg->clienterrmsg->szErrorMsg,
                      errmsg.c_str(),
                      TT_STRLEN);
     EnqueueMsg(mb);
@@ -425,7 +426,7 @@ void TTMsgQueue::OnRemoveUserAccount(const ACE_TString& username)
     IntTTMessage* msg = MakeMsgBlock(mb, CLIENTEVENT_CMD_USERACCOUNT_REMOVE,
                                      0,
                                      __USERACCOUNT);
-    ACE_OS::strsncpy(msg->useraccount->szUsername, username.c_str(), TT_STRLEN);
+    A2TT(msg->useraccount->szUsername, username.c_str(), TT_STRLEN);
     EnqueueMsg(mb);
 }
 
@@ -511,7 +512,7 @@ void TTMsgQueue::OnCommandError(int cmdid, int err_num, const ACE_TString& msg_)
     IntTTMessage* msg = MakeMsgBlock(mb, CLIENTEVENT_CMD_ERROR,
                                      cmdid, __CLIENTERRORMSG);
     msg->clienterrmsg->nErrorNo = err_num;
-    ACE_OS::strsncpy(msg->clienterrmsg->szErrorMsg, msg_.c_str(), TT_STRLEN);
+    A2TT(msg->clienterrmsg->szErrorMsg, msg_.c_str(), TT_STRLEN);
     EnqueueMsg(mb);
 }
 
@@ -530,7 +531,7 @@ void TTMsgQueue::OnInternalError(int errorno, const ACE_TString& msg_)
     IntTTMessage* msg = MakeMsgBlock(mb, CLIENTEVENT_INTERNAL_ERROR,
                                      0, __CLIENTERRORMSG);
     msg->clienterrmsg->nErrorNo = errorno;
-    ACE_OS::strsncpy(msg->clienterrmsg->szErrorMsg, msg_.c_str(), TT_STRLEN);
+    A2TT(msg->clienterrmsg->szErrorMsg, msg_.c_str(), TT_STRLEN);
     EnqueueMsg(mb);
 }
 
@@ -729,8 +730,8 @@ void TTMsgQueue::AudioDeviceChange(AudioDevEvent event, const LPCWSTR& name, con
     SoundDevice snd = {};
     snd.nSoundSystem = SOUNDSYSTEM_WASAPI;
     snd.nDeviceID = -1;
-    ACE_OS::strsncpy(snd.szDeviceName, name, TT_STRLEN);
-    ACE_OS::strsncpy(snd.szDeviceID, id, TT_STRLEN);
+    A2TT(snd.szDeviceName, name, TT_STRLEN);
+    A2TT(snd.szDeviceID, id, TT_STRLEN);
 
     ACE_Message_Block* mb = nullptr;
     IntTTMessage* msg = nullptr;

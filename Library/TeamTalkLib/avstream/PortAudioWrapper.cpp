@@ -44,6 +44,47 @@
 #include <propsys.h>
 #include <atlbase.h>
 #include <MMDeviceApi.h>
+#include <wmcodecdsp.h>
+#include <propkeydef.h>
+
+// MinGW does not have these AEC DMO constants — define them manually
+// Values from Windows SDK wmcodecdspuuid.h
+#ifndef AEC_SYSTEM_MODE
+typedef enum AEC_SYSTEM_MODE {
+    SINGLE_CHANNEL_AEC     = 0,
+    ADAPTIVE_ARRAY_ONLY    = 1,
+    OPTIBEAM_ARRAY_ONLY    = 2,
+    ADAPTIVE_ARRAY_AND_AEC = 3,
+    OPTIBEAM_ARRAY_AND_AEC = 4,
+    SINGLE_CHANNEL_NSAGC   = 5,
+    MODE_NOT_SET           = 6
+} AEC_SYSTEM_MODE;
+#endif
+
+#ifndef MFPKEY_WMAAECMA_SYSTEM_MODE
+// Base GUID for all MFPKEY_WMAAECMA properties: {6f52c567-0360-4bd2-9617-cbbac3d7344a}
+static const PROPERTYKEY MFPKEY_WMAAECMA_SYSTEM_MODE      = { { 0x6f52c567, 0x0360, 0x4bd2, { 0x96, 0x17, 0xcb, 0xba, 0xc3, 0xd7, 0x34, 0x4a } }, 0 };
+static const PROPERTYKEY MFPKEY_WMAAECMA_DEVICE_INDEXES   = { { 0x6f52c567, 0x0360, 0x4bd2, { 0x96, 0x17, 0xcb, 0xba, 0xc3, 0xd7, 0x34, 0x4a } }, 2 };
+static const PROPERTYKEY MFPKEY_WMAAECMA_FEATURE_MODE     = { { 0x6f52c567, 0x0360, 0x4bd2, { 0x96, 0x17, 0xcb, 0xba, 0xc3, 0xd7, 0x34, 0x4a } }, 11 };
+static const PROPERTYKEY MFPKEY_WMAAECMA_FEATR_AGC        = { { 0x6f52c567, 0x0360, 0x4bd2, { 0x96, 0x17, 0xcb, 0xba, 0xc3, 0xd7, 0x34, 0x4a } }, 19 };
+static const PROPERTYKEY MFPKEY_WMAAECMA_FEATR_NS         = { { 0x6f52c567, 0x0360, 0x4bd2, { 0x96, 0x17, 0xcb, 0xba, 0xc3, 0xd7, 0x34, 0x4a } }, 21 };
+static const PROPERTYKEY MFPKEY_WMAAECMA_FEATR_FRAME_SIZE = { { 0x6f52c567, 0x0360, 0x4bd2, { 0x96, 0x17, 0xcb, 0xba, 0xc3, 0xd7, 0x34, 0x4a } }, 20 };
+#endif
+
+#ifndef WMAAECMA_E_NO_ACTIVE_RENDER_STREAM
+#define WMAAECMA_E_NO_ACTIVE_RENDER_STREAM ((HRESULT)0x80045046L)
+#endif
+
+// Helper: convert WCHAR* (from Windows APIs) to ACE_TString (narrow, since ACE built without Unicode)
+static ACE_TString W2T(const WCHAR* ws)
+{
+    if (!ws) return ACE_TString();
+    int len = WideCharToMultiByte(CP_UTF8, 0, ws, -1, nullptr, 0, nullptr, nullptr);
+    if (len <= 0) return ACE_TString();
+    std::vector<char> buf(len);
+    WideCharToMultiByte(CP_UTF8, 0, ws, -1, buf.data(), len, nullptr, nullptr);
+    return ACE_TString(buf.data());
+}
 
 constexpr int WINAEC_SAMPLERATE = 22050;
 constexpr int WINAEC_CHANNELS = 1;
@@ -361,7 +402,7 @@ void PortAudio::SetupDefaultCommunicationDevice(sounddevices_t& sounddevs)
                     auto i = std::find_if(sounddevs.begin(), sounddevs.end(),
                         [deviceId](const std::pair<int, DeviceInfo>& d)
                         {
-                            return d.second.soundsystem == SOUND_API_WASAPI && d.second.deviceid == deviceId;
+                            return d.second.soundsystem == SOUND_API_WASAPI && d.second.deviceid == W2T(deviceId);
                         });
                     if (i != sounddevs.end())
                         i->second.features |= SOUNDDEVICEFEATURE_DEFAULTCOMDEVICE;
@@ -1226,7 +1267,7 @@ bool CWMAudioAECCapture::FindDevs(LONG& indevindex, LONG& outdevindex)
 
         PropVariantInit(&value);
         if (SUCCEEDED(spEndpoints->Item(index, &spDevice)) && SUCCEEDED(spDevice->GetId(&pszDeviceId)))
-            indevs[pszDeviceId] = index;
+            indevs[W2T(pszDeviceId)] = index;
 
         PropVariantClear(&value);
         CoTaskMemFree(pszDeviceId);
@@ -1252,7 +1293,7 @@ bool CWMAudioAECCapture::FindDevs(LONG& indevindex, LONG& outdevindex)
 
         PropVariantInit(&value);
         if (SUCCEEDED(spEndpoints->Item(index, &spDevice)) && SUCCEEDED(spDevice->GetId(&pszDeviceId)))
-            outdevs[pszDeviceId] = index;
+            outdevs[W2T(pszDeviceId)] = index;
 
         PropVariantClear(&value);
         CoTaskMemFree(pszDeviceId);

@@ -26,6 +26,7 @@
 
 #include "Convert.h"
 #include "TTClientMsg.h"
+#include "TTStrConvert.h"
 
 #include "avstream/MediaStreamer.h"
 #include "avstream/SoundLoopback.h"
@@ -355,7 +356,13 @@ static clientnode_t GET_CLIENTNODE(TTInstance* pInstance)
 
 TEAMTALKDLL_API const TTCHAR* TT_GetVersion(void)
 {
+#if defined(WIN32)
+    static TTCHAR ver[32] = {};
+    if (!ver[0]) mbstowcs(ver, TEAMTALK_VERSION, 32);
+    return ver;
+#else
     return ACE_TEXT( TEAMTALK_VERSION );
+#endif
 }
 
 #if defined(WIN32)
@@ -478,7 +485,7 @@ TEAMTALKDLL_API TTBOOL TT_GetSoundDevices(IN OUT SoundDevice* pSoundDevices,
 
     for(size_t i=0;i<lessDevs;i++)
     {
-        ACE_OS::strsncpy(pSoundDevices[i].szDeviceName, 
+        A2TT(pSoundDevices[i].szDeviceName, 
                         devices[i].devicename.c_str(), 
                         TT_STRLEN);
         pSoundDevices[i].nDeviceID = devices[i].id;
@@ -489,7 +496,7 @@ TEAMTALKDLL_API TTBOOL TT_GetSoundDevices(IN OUT SoundDevice* pSoundDevices,
         pSoundDevices[i].nSoundSystem = (SoundSystem)devices[i].soundsystem;
         pSoundDevices[i].uSoundDeviceFeatures = devices[i].features;
 
-        ACE_OS::strsncpy(pSoundDevices[i].szDeviceID, 
+        A2TT(pSoundDevices[i].szDeviceID, 
                         devices[i].deviceid.c_str(), 
                         TT_STRLEN);
         pSoundDevices[i].nWaveDeviceID = devices[i].wavedeviceid;
@@ -1001,7 +1008,7 @@ TEAMTALKDLL_API TTBOOL TT_StartRecordingMuxedStreams(IN TTInstance* lpTTInstance
     if((lpAudioCodec == nullptr) || !Convert(*lpAudioCodec, codec))
         return FALSE;
 
-    return static_cast<TTBOOL>(clientnode->StartRecordingMuxedAudioFile(codec, uStreamTypes, szAudioFileName,
+    return static_cast<TTBOOL>(clientnode->StartRecordingMuxedAudioFile(codec, uStreamTypes, TT2A(szAudioFileName),
                                                     teamtalk::AudioFileFormat(uAFF)));
 }
 
@@ -1013,7 +1020,7 @@ TEAMTALKDLL_API TTBOOL TT_StartRecordingMuxedAudioFileEx(IN TTInstance* lpTTInst
     clientnode_t clientnode;
     GET_CLIENTNODE_RET(clientnode, lpTTInstance, FALSE);
     
-    return static_cast<TTBOOL>(clientnode->StartRecordingMuxedAudioFile(nChannelID, STREAMTYPE_VOICE, szAudioFileName,
+    return static_cast<TTBOOL>(clientnode->StartRecordingMuxedAudioFile(nChannelID, STREAMTYPE_VOICE, TT2A(szAudioFileName),
                                                     teamtalk::AudioFileFormat(uAFF)));
 }
 
@@ -1078,13 +1085,13 @@ TEAMTALKDLL_API TTBOOL TT_GetVideoCaptureDevices(IN OUT VideoCaptureDevice* lpVi
     size_t const lessDevs = (size_t)*lpnHowMany < devs.size()?*lpnHowMany:devs.size();
     for(size_t i=0;i<lessDevs;i++)
     {
-        ACE_OS::strsncpy(lpVideoDevices[i].szCaptureAPI, 
+        A2TT(lpVideoDevices[i].szCaptureAPI, 
                          devs[i].api.c_str(),
                          TT_STRLEN);
-        ACE_OS::strsncpy(lpVideoDevices[i].szDeviceName, 
+        A2TT(lpVideoDevices[i].szDeviceName, 
                          devs[i].devicename.c_str(), 
                          TT_STRLEN);
-        ACE_OS::strsncpy(lpVideoDevices[i].szDeviceID, 
+        A2TT(lpVideoDevices[i].szDeviceID, 
                          devs[i].deviceid.c_str(), 
                          TT_STRLEN);
 
@@ -1118,7 +1125,7 @@ TEAMTALKDLL_API TTBOOL TT_InitVideoCaptureDevice(IN TTInstance* lpTTInstance,
     media::VideoFormat cap_format;
     Convert(*lpVideoFormat, cap_format);
 
-    return static_cast<TTBOOL>(clientnode->InitVideoCapture(szDeviceID, cap_format));
+    return static_cast<TTBOOL>(clientnode->InitVideoCapture(TT2A(szDeviceID), cap_format));
 }
 
 TEAMTALKDLL_API TTBOOL TT_CloseVideoCaptureDevice(IN TTInstance* lpTTInstance)
@@ -1300,8 +1307,8 @@ TEAMTALKDLL_API TTBOOL TT_Connect(IN TTInstance* lpTTInstance,
                                   IN INT32 nLocalUdpPort,
                                   IN TTBOOL bEncrypted)
 {
-    return TT_ConnectSysID(lpTTInstance, szHostAddress, nTcpPort, nUdpPort, 
-                           nLocalTcpPort, nLocalUdpPort, bEncrypted, SERVER_WELCOME);
+    return TT_ConnectSysID(lpTTInstance, szHostAddress, nTcpPort, nUdpPort,
+                           nLocalTcpPort, nLocalUdpPort, bEncrypted, (const TTCHAR*)L"teamtalk");
 }
 
 TEAMTALKDLL_API TTBOOL TT_ConnectSysID(IN TTInstance* lpTTInstance,
@@ -1318,8 +1325,8 @@ TEAMTALKDLL_API TTBOOL TT_ConnectSysID(IN TTInstance* lpTTInstance,
     if(szHostAddress == nullptr)
         return FALSE;
 
-    return static_cast<TTBOOL>(clientnode->Connect(bEncrypted != 0, szHostAddress, nTcpPort, nUdpPort, 
-                                szSystemID, ACE_TEXT(""), nLocalTcpPort, 
+    return static_cast<TTBOOL>(clientnode->Connect(bEncrypted != 0, TT2A(szHostAddress), nTcpPort, nUdpPort,
+                                TT2A(szSystemID), ACE_TString(), nLocalTcpPort,
                                 nLocalUdpPort));
 }
 
@@ -1338,8 +1345,8 @@ TEAMTALKDLL_API TTBOOL TT_ConnectEx(IN TTInstance* lpTTInstance,
     if((szHostAddress == nullptr) || (szBindIPAddr == nullptr))
         return FALSE;
 
-    return static_cast<TTBOOL>(clientnode->Connect(bEncrypted != 0, szHostAddress, nTcpPort, nUdpPort, 
-                                SERVER_WELCOME, szBindIPAddr, nLocalTcpPort, 
+    return static_cast<TTBOOL>(clientnode->Connect(bEncrypted != 0, TT2A(szHostAddress), nTcpPort, nUdpPort,
+                                ACE_TString("teamtalk"), TT2A(szBindIPAddr), nLocalTcpPort,
                                 nLocalUdpPort));
 }
 
@@ -1412,8 +1419,8 @@ TEAMTALKDLL_API INT32 TT_DoLogin(IN TTInstance* lpTTInstance,
                                  IN const TTCHAR* szUsername,
                                  IN const TTCHAR* szPassword)
 {
-    return TT_DoLoginEx(lpTTInstance, szNickname, szUsername, 
-                        szPassword, ACE_TEXT(""));
+    return TT_DoLoginEx(lpTTInstance, szNickname, szUsername,
+                        szPassword, (const TTCHAR*)L"");
 }
 
 TEAMTALKDLL_API INT32 TT_DoLoginEx(IN TTInstance* lpTTInstance,
@@ -1426,8 +1433,8 @@ TEAMTALKDLL_API INT32 TT_DoLoginEx(IN TTInstance* lpTTInstance,
     GET_CLIENTNODE_RET(clientnode, lpTTInstance, -1);
 
     if((szNickname != nullptr) && (szUsername != nullptr) && (szPassword != nullptr) && (szClientName != nullptr))
-        return clientnode->DoLogin(szNickname, szUsername, 
-                                    szPassword, szClientName);
+        return clientnode->DoLogin(TT2A(szNickname), TT2A(szUsername),
+                                    TT2A(szPassword), TT2A(szClientName));
     return -1;
 }
 
@@ -1462,7 +1469,7 @@ TEAMTALKDLL_API INT32 TT_DoJoinChannelByID(IN TTInstance* lpTTInstance,
     {
         teamtalk::ChannelProp prop;
         prop.channelid = nChannelID;
-        prop.passwd = szPassword;
+        prop.passwd = TT2A(szPassword);
         return clientnode->DoJoinChannel(prop, true);
     }
     return -1;
@@ -1483,7 +1490,7 @@ TEAMTALKDLL_API INT32 TT_DoChangeNickname(IN TTInstance* lpTTInstance,
     clientnode_t clientnode;
     GET_CLIENTNODE_RET(clientnode, lpTTInstance, -1);
     if( szNewNick != nullptr )
-        return clientnode->DoChangeNickname(szNewNick);
+        return clientnode->DoChangeNickname(TT2A(szNewNick));
     return -1;
 }
 
@@ -1495,7 +1502,7 @@ TEAMTALKDLL_API INT32 TT_DoChangeStatus(IN TTInstance* lpTTInstance,
     GET_CLIENTNODE_RET(clientnode, lpTTInstance, -1);
 
     if(szStatusMessage != nullptr)
-        return clientnode->DoChangeStatus(nStatusMode, szStatusMessage);
+        return clientnode->DoChangeStatus(nStatusMode, TT2A(szStatusMessage));
     return -1;
 }
 
@@ -1535,8 +1542,8 @@ TEAMTALKDLL_API INT32 TT_DoChannelOpEx(IN TTInstance* lpTTInstance,
     GET_CLIENTNODE_RET(clientnode, lpTTInstance, -1);
     if(szOpPassword == nullptr)
         return -1;
-    return clientnode->DoChannelOperator(nUserID, nChannelID, 
-                                          szOpPassword,
+    return clientnode->DoChannelOperator(nUserID, nChannelID,
+                                          TT2A(szOpPassword),
                                           bMakeOperator != 0);
 }
 
@@ -1557,8 +1564,8 @@ TEAMTALKDLL_API INT32 TT_DoSendFile(IN TTInstance* lpTTInstance,
     clientnode_t clientnode;
     GET_CLIENTNODE_RET(clientnode, lpTTInstance, -1);
 
-    if((szLocalFilePath != nullptr) && ACE_OS::filesize(szLocalFilePath)>=0)
-        return clientnode->DoFileSend(nChannelID, szLocalFilePath);
+    if((szLocalFilePath != nullptr) && ACE_OS::filesize(TT2A(szLocalFilePath).c_str())>=0)
+        return clientnode->DoFileSend(nChannelID, TT2A(szLocalFilePath));
     return -1;
 }
 
@@ -1575,7 +1582,7 @@ TEAMTALKDLL_API INT32 TT_DoRecvFile(IN TTInstance* lpTTInstance,
         clientchannel_t const chan = clientnode->GetChannel(nChannelID);
         teamtalk::RemoteFile remotefile;
         if(chan && chan->GetFile(nFileID, remotefile))
-            return clientnode->DoFileRecv(nChannelID, szLocalFilePath,
+            return clientnode->DoFileRecv(nChannelID, TT2A(szLocalFilePath),
                                            remotefile.filename);
     }
     return -1;
@@ -1690,7 +1697,7 @@ TEAMTALKDLL_API TTBOOL TT_GetChannelPath(IN TTInstance* lpTTInstance,
         clientchannel_t const channel = clientnode->GetChannel(nChannelID);
         if(channel)
         {
-            ACE_OS::strsncpy(szChannelPath, channel->GetChannelPath().c_str(), TT_STRLEN);
+            A2TT(szChannelPath, channel->GetChannelPath().c_str(), TT_STRLEN);
             return TRUE;
         }
     }
@@ -1705,8 +1712,8 @@ TEAMTALKDLL_API INT32 TT_GetChannelIDFromPath(IN TTInstance* lpTTInstance,
 
     if(szChannelPath != nullptr)
     {
-        clientchannel_t const channel = ChangeChannel(clientnode->GetRootChannel(), 
-                                                szChannelPath);
+        clientchannel_t const channel = ChangeChannel(clientnode->GetRootChannel(),
+                                                TT2A(szChannelPath));
         if (channel)
             return channel->GetChannelID();
     }
@@ -1770,12 +1777,12 @@ TEAMTALKDLL_API TTBOOL TT_SetUserMediaStorageDirEx(IN TTInstance* lpTTInstance,
     if (user)
     {
         if(szFolderPath == nullptr)
-            szFolderPath = ACE_TEXT("");
+            szFolderPath = L"";
         if(szFileNameVars == nullptr)
-            szFileNameVars = ACE_TEXT("");
+            szFileNameVars = L"";
 
-        user->SetAudioFolder(szFolderPath);
-        user->SetAudioFileVariables(szFileNameVars);
+        user->SetAudioFolder(TT2A(szFolderPath));
+        user->SetAudioFileVariables(TT2A(szFileNameVars));
         user->SetAudioFileFormat((teamtalk::AudioFileFormat)uAFF);
         user->SetRecordingCloseExtraDelay(nStopRecordingExtraDelayMSec);
         return TRUE;
@@ -1881,7 +1888,7 @@ TEAMTALKDLL_API TTBOOL TT_GetUserByUsername(IN TTInstance* lpTTInstance,
     if((szUsername == nullptr) || (lpUser == nullptr))
         return FALSE;
 
-    clientuser_t const user = clientnode->GetUserByUsername(szUsername);
+    clientuser_t const user = clientnode->GetUserByUsername(TT2A(szUsername));
     if(user.get() != nullptr)
         return TT_GetUser(lpTTInstance, user->GetUserID(), lpUser);
     return FALSE;
@@ -2159,7 +2166,7 @@ TEAMTALKDLL_API TTBOOL TT_StartStreamingMediaFileToChannelEx(IN TTInstance* lpTT
     if (lpVideoCodec != nullptr)
         Convert(*lpVideoCodec, vid_codec);
 
-    return static_cast<TTBOOL>(clientnode->StartStreamingMediaFile(szMediaFilePath, lpMediaFilePlayback->uOffsetMSec,
+    return static_cast<TTBOOL>(clientnode->StartStreamingMediaFile(TT2A(szMediaFilePath), lpMediaFilePlayback->uOffsetMSec,
                                                lpMediaFilePlayback->bPaused != 0, preprocessor, vid_codec));
 }
 
@@ -2203,7 +2210,7 @@ TEAMTALKDLL_API INT32 TT_InitLocalPlayback(IN TTInstance* lpTTInstance,
     teamtalk::AudioPreprocessor preprocessor;
     Convert(lpMediaFilePlayback->audioPreprocessor, preprocessor);
 
-    return clientnode->InitMediaPlayback(szMediaFilePath, lpMediaFilePlayback->uOffsetMSec, 
+    return clientnode->InitMediaPlayback(TT2A(szMediaFilePath), lpMediaFilePlayback->uOffsetMSec,
                                           lpMediaFilePlayback->bPaused != 0, preprocessor);
 }
 
@@ -2237,7 +2244,7 @@ TEAMTALKDLL_API TTBOOL TT_GetMediaFileInfo(IN const TTCHAR* szMediaFilePath,
         return FALSE;
 
     MediaFileProp prop;
-    if(GetMediaFileProp(szMediaFilePath, prop))
+    if(GetMediaFileProp(TT2A(szMediaFilePath), prop))
     {
         Convert(prop, *lpMediaFileInfo);
         return TRUE;
@@ -2702,7 +2709,7 @@ TEAMTALKDLL_API TTBOOL TT_Windows_GetWindow(IN HWND hWnd,
     if(::GetWindowRect(hWnd, &r))
     {
         lpShareWindow->hWnd = hWnd;
-        GetWindowText(hWnd, lpShareWindow->szWindowTitle, TT_STRLEN);
+        GetWindowTextW(hWnd, lpShareWindow->szWindowTitle, TT_STRLEN);
         lpShareWindow->nWndX = r.left;
         lpShareWindow->nWndY = r.top;
         lpShareWindow->nWidth = r.right-r.left;
@@ -3028,7 +3035,7 @@ TEAMTALKDLL_API TTBOOL TT_MacOS_GetWindow(IN INT32 nIndex,
 //     lpShareWindow->nWindowID = windowIDs[nIndex];
 //     lpShareWindow->nWidth = (INT32)rect.size.width;
 //     lpShareWindow->nHeight = (INT32)rect.size.height;
-//     ACE_OS::strsncpy(lpShareWindow->szWindowTitle, 
+//     A2TT(lpShareWindow->szWindowTitle, 
 //                      data.windowTitles[nIndex].c_str(), TT_STRLEN);
 
     return TRUE;
@@ -3361,7 +3368,7 @@ TEAMTALKDLL_API TTBOOL TT_HotKey_GetKeyString(IN TTInstance* lpTTInstance,
 #endif
 
     UINT32 scancode = MapVirtualKey(nVKCode, MAPVK_VK_TO_VSC);
-    return ::GetKeyNameText( scancode << 16 , szKeyName, TT_STRLEN)>0;
+    return ::GetKeyNameTextW( scancode << 16 , szKeyName, TT_STRLEN)>0;
 }
 
 #endif /* WIN32 hotkeys */
@@ -3515,7 +3522,7 @@ TEAMTALKDLL_API TTBOOL TT_DBG_WriteAudioFileTone(IN const MediaFileInfo* lpMedia
     }
 
     WavePCMFile wavefile;
-    if (!wavefile.NewFile(lpMediaFileInfo->szFileName, fmt.samplerate, fmt.channels))
+    if (!wavefile.NewFile(TT2A(lpMediaFileInfo->szFileName), fmt.samplerate, fmt.channels))
         return FALSE;
     
     int sampleindex = 0;
@@ -3634,7 +3641,7 @@ TEAMTALKDLL_API INT32 TT_DoUnsubscribe(IN TTInstance* lpTTInstance,
 TEAMTALKDLL_API void TT_GetErrorMessage(IN INT32 nError, OUT TTCHAR szErrorMsg[TT_STRLEN])
 {
     ACE_TString const err = teamtalk::GetErrorDescription(nError);
-    ACE_OS::strsncpy(szErrorMsg, err.c_str(), TT_STRLEN);
+    A2TT(szErrorMsg, err.c_str(), TT_STRLEN);
 }
 
 TEAMTALKDLL_API TTBOOL TT_GetMessage(IN TTInstance* lpTTInstance, 
@@ -3780,7 +3787,7 @@ TEAMTALKDLL_API INT32 TT_DoDeleteUserAccount(IN TTInstance* lpTTInstance,
     GET_CLIENTNODE_RET(clientnode, lpTTInstance, -1);
     if(szUsername == nullptr)
         return -1;
-    return clientnode->DoDeleteUserAccount(szUsername);
+    return clientnode->DoDeleteUserAccount(TT2A(szUsername));
 }
 
 TEAMTALKDLL_API INT32 TT_DoBanUser(IN TTInstance* lpTTInstance,
@@ -3836,7 +3843,7 @@ TEAMTALKDLL_API INT32 TT_DoBanIPAddress(IN TTInstance* lpTTInstance,
 
     teamtalk::BannedUser ban;
     ban.bantype = teamtalk::BANTYPE_DEFAULT;
-    ban.ipaddr = szIPAddress;
+    ban.ipaddr = TT2A(szIPAddress);
 
     return clientnode->DoBanUser(0, ban);
 }
@@ -3849,7 +3856,7 @@ TEAMTALKDLL_API INT32 TT_DoUnBanUser(IN TTInstance* lpTTInstance,
     GET_CLIENTNODE_RET(clientnode, lpTTInstance, -1);
     teamtalk::BannedUser ban;
     ban.bantype = teamtalk::BANTYPE_DEFAULT;
-    ban.ipaddr = szIPAddress;
+    ban.ipaddr = TT2A(szIPAddress);
     return clientnode->DoUnBanUser(ban);
 }
 
@@ -4049,7 +4056,9 @@ TEAMTALKDLL_API TTBOOL TT_Mixer_GetMixerName(IN INT32 nMixerIndex, OUT TTCHAR sz
 {
     if(szMixerName)
     {
-        MixerGetName(nMixerIndex, szMixerName);
+        char buf[TT_STRLEN] = {};
+        MixerGetName(nMixerIndex, buf);
+        A2TT(szMixerName, buf, TT_STRLEN);
         return TRUE;
     }
     return FALSE;
@@ -4058,13 +4067,19 @@ TEAMTALKDLL_API TTBOOL TT_Mixer_GetMixerName(IN INT32 nMixerIndex, OUT TTCHAR sz
 TEAMTALKDLL_API TTBOOL TT_Mixer_GetWaveInName(IN INT32 nWaveDeviceID,
                                               OUT TTCHAR szMixerName[TT_STRLEN])
 {
-    return MixerGetWaveInName(nWaveDeviceID, szMixerName);
+    char buf[TT_STRLEN] = {};
+    bool r = MixerGetWaveInName(nWaveDeviceID, buf);
+    A2TT(szMixerName, buf, TT_STRLEN);
+    return r;
 }
 
 TEAMTALKDLL_API TTBOOL TT_Mixer_GetWaveOutName(IN INT32 nWaveDeviceID,
                                                OUT TTCHAR szMixerName[TT_STRLEN])
 {
-    return MixerGetWaveOutName(nWaveDeviceID, szMixerName);
+    char buf[TT_STRLEN] = {};
+    bool r = MixerGetWaveOutName(nWaveDeviceID, buf);
+    A2TT(szMixerName, buf, TT_STRLEN);
+    return r;
 }
 
 TEAMTALKDLL_API TTBOOL TT_Mixer_SetWaveOutMute(IN INT32 nWaveDeviceID, IN MixerControl nControl, TTBOOL bMute)
@@ -4286,7 +4301,7 @@ TEAMTALKDLL_API TTBOOL TT_Mixer_GetWaveInControlName(IN INT32 nWaveDeviceID, IN 
     InOutValue val = {};
     val.value = nControlIndex;
     result = MixerWaveIn(nWaveDeviceID, MIXER_WAVEIN_BYINDEX | MIXER_WAVEIN_GET | MIXER_WAVEIN_NAME, val);
-    ACE_OS::strsncpy(szDeviceName, val.name, TT_STRLEN);
+    A2TT(szDeviceName, val.name, TT_STRLEN);
     return result;
 }
 
@@ -4322,22 +4337,22 @@ TEAMTALKDLL_API TTBOOL TT_Firewall_Enable(IN TTBOOL bEnable)
 
 TEAMTALKDLL_API TTBOOL TT_Firewall_AppExceptionExists(IN const TTCHAR* szExecutable)
 {
-    return WinFirewall(false).IsApplicationFirewalled(szExecutable);
+    return WinFirewall(false).IsApplicationFirewalled(TT2A(szExecutable));
 }
 
-TEAMTALKDLL_API TTBOOL TT_Firewall_AddAppException(IN const TTCHAR* szName, 
+TEAMTALKDLL_API TTBOOL TT_Firewall_AddAppException(IN const TTCHAR* szName,
                                                    IN const TTCHAR* szExecutable)
 {
-    if(WinFirewall(WinFirewall::HasUAE()).AddException(szExecutable,
-                                                       szName))
-        return WinFirewall(false).IsApplicationFirewalled(szExecutable);
+    if(WinFirewall(WinFirewall::HasUAE()).AddException(TT2A(szExecutable),
+                                                       TT2A(szName)))
+        return WinFirewall(false).IsApplicationFirewalled(TT2A(szExecutable));
     return FALSE;
 }
 
 TEAMTALKDLL_API TTBOOL TT_Firewall_RemoveAppException(IN const TTCHAR* szExecutable)
 {
-    if(WinFirewall(false).IsApplicationFirewalled(szExecutable))
-        return WinFirewall(WinFirewall::HasUAE()).RemoveException(szExecutable);
+    if(WinFirewall(false).IsApplicationFirewalled(TT2A(szExecutable)))
+        return WinFirewall(WinFirewall::HasUAE()).RemoveException(TT2A(szExecutable));
     return false;
 }
 

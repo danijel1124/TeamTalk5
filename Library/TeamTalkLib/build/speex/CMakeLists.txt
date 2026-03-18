@@ -80,6 +80,38 @@ if (MSVC)
     IMPORTED_LOCATION_DEBUG ${INSTALL_DIR}/lib/${CMAKE_VS_PLATFORM_NAME}/libspeexd.lib
     IMPORTED_LOCATION ${INSTALL_DIR}/lib/${CMAKE_VS_PLATFORM_NAME}/libspeex_sse2.lib)
 
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  # Windows MinGW cross-compile
+
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    ExternalProject_Add(speex-src
+      GIT_REPOSITORY    https://github.com/xiph/speex.git
+      GIT_TAG           Speex-1.2.1
+      UPDATE_COMMAND    ""
+      PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/speex
+      INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_SPEEX}
+      CONFIGURE_COMMAND <SOURCE_DIR>/autogen.sh
+      COMMAND           <SOURCE_DIR>/configure --host=x86_64-w64-mingw32
+                        --prefix=<INSTALL_DIR>
+                        --enable-shared=no --enable-static=yes --disable-binaries
+      BUILD_COMMAND     make ${TOOLCHAIN_BUILD_MAKEJOBS}
+      INSTALL_COMMAND   make ${TOOLCHAIN_BUILD_MAKEJOBS} install
+      BUILD_BYPRODUCTS  <INSTALL_DIR>/lib/libspeex.a
+      )
+    ExternalProject_Get_Property(speex-src INSTALL_DIR)
+    file(MAKE_DIRECTORY ${INSTALL_DIR}/include)
+  else()
+    set (INSTALL_DIR ${TOOLCHAIN_INSTALL_PREFIX_SPEEX})
+  endif()
+
+  add_library(speex STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(speex speex-src)
+  endif()
+  target_include_directories (speex INTERFACE ${INSTALL_DIR}/include)
+  set_target_properties(speex PROPERTIES
+    IMPORTED_LOCATION ${INSTALL_DIR}/lib/libspeex.a)
+
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
   if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)

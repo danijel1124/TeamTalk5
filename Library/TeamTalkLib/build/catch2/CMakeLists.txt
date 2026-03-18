@@ -49,6 +49,44 @@ if (MSVC)
     IMPORTED_LOCATION_DEBUG ${INSTALL_DIR}/lib/Catch2Maind.lib
     IMPORTED_LOCATION ${INSTALL_DIR}/lib/Catch2Main.lib)
 
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  # Windows MinGW cross-compile
+
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    ExternalProject_Add(catch2-src
+      GIT_REPOSITORY    https://github.com/catchorg/Catch2.git
+      GIT_TAG           v3.13.0
+      GIT_SHALLOW       TRUE
+      UPDATE_COMMAND    ""
+      PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/catch2
+      INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_CATCH2}
+      CMAKE_ARGS        -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+                        -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+                        -DCMAKE_BUILD_TYPE=release
+                        -DCATCH_INSTALL_DOCS=OFF
+                        -DCATCH_INSTALL_EXTRAS=OFF
+      BUILD_COMMAND     ${CMAKE_COMMAND} --build .
+      BUILD_BYPRODUCTS  <INSTALL_DIR>/lib/libCatch2.a <INSTALL_DIR>/lib/libCatch2Main.a
+      )
+    ExternalProject_Get_Property(catch2-src INSTALL_DIR)
+    file(MAKE_DIRECTORY ${INSTALL_DIR}/include)
+  else()
+    set (INSTALL_DIR ${TOOLCHAIN_INSTALL_PREFIX_CATCH2})
+  endif()
+
+  add_library(catch2 STATIC IMPORTED GLOBAL)
+  add_library(catch2main STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(catch2 catch2-src)
+    add_dependencies(catch2main catch2-src)
+  endif()
+  target_include_directories (catch2 INTERFACE ${INSTALL_DIR}/include)
+  target_include_directories (catch2main INTERFACE ${INSTALL_DIR}/include)
+  set_target_properties(catch2 PROPERTIES
+    IMPORTED_LOCATION ${INSTALL_DIR}/lib/libCatch2.a)
+  set_target_properties(catch2main PROPERTIES
+    IMPORTED_LOCATION ${INSTALL_DIR}/lib/libCatch2Main.a)
+
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
     string (REPLACE ";" "\$<SEMICOLON>" ARCHS "${CMAKE_OSX_ARCHITECTURES}")

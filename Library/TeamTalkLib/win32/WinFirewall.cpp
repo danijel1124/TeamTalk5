@@ -24,19 +24,21 @@
 #include "WinFirewall.h"
 #include "myace/MyACE.h"
 
+#include <sal.h>
+#include <string>
 #include <Strsafe.h>
 #include <VersionHelpers.h>
 
 #include <cassert>
 
-static HRESULT CoCreateInstanceAsAdmin(HWND hwnd, REFCLSID rclsid, REFIID riid, __out void ** ppv)
+static HRESULT CoCreateInstanceAsAdmin(HWND hwnd, REFCLSID rclsid, REFIID riid, void ** ppv)
 {
     BIND_OPTS3 bo;
     WCHAR  wszCLSID[50];
     WCHAR  wszMonikerName[300];
 
     StringFromGUID2(rclsid, wszCLSID, sizeof(wszCLSID)/sizeof(wszCLSID[0])); 
-    HRESULT const hr = StringCchPrintf(wszMonikerName, sizeof(wszMonikerName)/sizeof(wszMonikerName[0]), L"Elevation:Administrator!new:%s", wszCLSID);
+    HRESULT const hr = StringCchPrintfW(wszMonikerName, sizeof(wszMonikerName)/sizeof(wszMonikerName[0]), L"Elevation:Administrator!new:%s", wszCLSID);
     if (FAILED(hr))
         return hr;
     memset(&bo, 0, sizeof(bo));
@@ -860,7 +862,8 @@ bool WinFirewall::IsApplicationFirewalled(const ACE_TString& exefile)
         return false;
 
     BOOL bEnabled = FALSE;
-    HRESULT const hr = WindowsFirewallAppIsEnabled(m_fw, exefile.c_str(), &bEnabled);
+    std::wstring wexefile(exefile.begin(), exefile.end());
+    HRESULT const hr = WindowsFirewallAppIsEnabled(m_fw, wexefile.c_str(), &bEnabled);
     return bEnabled != 0;
 }
 
@@ -870,7 +873,9 @@ bool WinFirewall::AddException(const ACE_TString& exefile,
     if (m_fw == nullptr)
         return false;
 
-    HRESULT const hr = WindowsFirewallAddApp(m_fw, exefile.c_str(), name.c_str());
+    std::wstring wexefile(exefile.begin(), exefile.end());
+    std::wstring wname(name.begin(), name.end());
+    HRESULT const hr = WindowsFirewallAddApp(m_fw, wexefile.c_str(), wname.c_str());
     return SUCCEEDED(hr);
 }
 
@@ -878,6 +883,7 @@ bool WinFirewall::RemoveException(const ACE_TString& exefile)
 {
     if (m_fw == nullptr)
         return false;
-    HRESULT const hr = WindowsFirewallRemoveApp(m_fw, exefile.c_str());
+    std::wstring wexefile(exefile.begin(), exefile.end());
+    HRESULT const hr = WindowsFirewallRemoveApp(m_fw, wexefile.c_str());
     return SUCCEEDED(hr);
 }

@@ -575,11 +575,7 @@ void VoiceLogger::BeginLog(ClientUser& from_user,
 
     time_t const now = time(nullptr);
     struct tm* ttt = localtime(&now);
-#ifdef ACE_WIN32
-    wcsftime(buf, STR_SIZE-1, var.c_str(), ttt);
-#else
     ACE_OS::strftime(buf, STR_SIZE-1, var.c_str(), ttt);
-#endif
     buf[STR_SIZE-1] = 0;
 
     // if(username.length())

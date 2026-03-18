@@ -64,7 +64,7 @@ if (FEATURE_MSDMO)
   list (APPEND AVSTREAM_HEADERS ${TEAMTALKLIB_ROOT}/avstream/DMOResampler.h)
   list (APPEND AVSTREAM_SOURCES ${TEAMTALKLIB_ROOT}/avstream/DMOResampler.cpp)
   list (APPEND AVSTREAM_COMPILE_FLAGS -DENABLE_DMORESAMPLER)
-  list (APPEND AVSTREAM_LINK_FLAGS Msdmo strmiids)
+  list (APPEND AVSTREAM_LINK_FLAGS msdmo strmiids) # lowercase: Linux linker is case-sensitive
 endif()
 
 if (FEATURE_DSHOW)

@@ -78,6 +78,38 @@ if (MSVC)
     IMPORTED_LOCATION_DEBUG ${INSTALL_DIR}/lib/${CMAKE_VS_PLATFORM_NAME}/libspeexdspd.lib
     IMPORTED_LOCATION ${INSTALL_DIR}/lib/${CMAKE_VS_PLATFORM_NAME}/libspeexdsp_sse.lib)
 
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  # Windows MinGW cross-compile
+
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    ExternalProject_Add(speexdsp-src
+      GIT_REPOSITORY    https://github.com/xiph/speexdsp.git
+      GIT_TAG           SpeexDSP-1.2.1
+      UPDATE_COMMAND    ""
+      PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/speexdsp
+      INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_SPEEXDSP}
+      CONFIGURE_COMMAND <SOURCE_DIR>/autogen.sh
+      COMMAND           <SOURCE_DIR>/configure --host=x86_64-w64-mingw32
+                        --prefix=<INSTALL_DIR>
+                        --enable-shared=no --enable-static=yes --disable-examples
+      BUILD_COMMAND     make ${TOOLCHAIN_BUILD_MAKEJOBS}
+      INSTALL_COMMAND   make ${TOOLCHAIN_BUILD_MAKEJOBS} install
+      BUILD_BYPRODUCTS  <INSTALL_DIR>/lib/libspeexdsp.a
+      )
+    ExternalProject_Get_Property(speexdsp-src INSTALL_DIR)
+    file(MAKE_DIRECTORY ${INSTALL_DIR}/include)
+  else()
+    set (INSTALL_DIR ${TOOLCHAIN_INSTALL_PREFIX_SPEEXDSP})
+  endif()
+
+  add_library(speexdsp STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(speexdsp speexdsp-src)
+  endif()
+  target_include_directories (speexdsp INTERFACE ${INSTALL_DIR}/include)
+  set_target_properties(speexdsp PROPERTIES
+    IMPORTED_LOCATION ${INSTALL_DIR}/lib/libspeexdsp.a)
+
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
   if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)

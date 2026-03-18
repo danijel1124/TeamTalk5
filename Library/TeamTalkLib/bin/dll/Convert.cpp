@@ -44,6 +44,8 @@
 #include <algorithm>
 #include <map>
 
+#include "TTStrConvert.h"
+
 //some inspiration found here: http://www.vmware.com/support/ws45/doc/devices_linux_kb_ws.html
 
 enum TTKey
@@ -1115,10 +1117,10 @@ bool Convert(const teamtalk::ChannelProp& chanprop, Channel& result)
 
     result.nParentID = chanprop.parentid;
     result.nChannelID = chanprop.channelid;
-    ACE_OS::strsncpy(result.szName, chanprop.name.c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szTopic, chanprop.topic.c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szPassword, chanprop.passwd.c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szOpPassword, chanprop.oppasswd.c_str(), TT_STRLEN);
+    A2TT(result.szName, chanprop.name.c_str(), TT_STRLEN);
+    A2TT(result.szTopic, chanprop.topic.c_str(), TT_STRLEN);
+    A2TT(result.szPassword, chanprop.passwd.c_str(), TT_STRLEN);
+    A2TT(result.szOpPassword, chanprop.oppasswd.c_str(), TT_STRLEN);
     result.bPassword = static_cast<TTBOOL>(chanprop.bProtected);
     result.nMaxUsers = chanprop.maxusers;
     result.uChannelType = chanprop.chantype;
@@ -1179,14 +1181,14 @@ bool Convert(const Channel& channel, teamtalk::ChannelProp& chanprop)
 
     chanprop.channelid = channel.nChannelID;
     chanprop.parentid = channel.nParentID;
-    chanprop.name = channel.szName;
+    chanprop.name = TT2A(channel.szName);
     chanprop.chantype = channel.uChannelType;
     chanprop.userdata = channel.nUserData;
     chanprop.diskquota = channel.nDiskQuota;
     chanprop.maxusers = channel.nMaxUsers;
-    chanprop.oppasswd = channel.szOpPassword;
-    chanprop.passwd = channel.szPassword;
-    chanprop.topic = channel.szTopic;
+    chanprop.oppasswd = TT2A(channel.szOpPassword);
+    chanprop.passwd = TT2A(channel.szPassword);
+    chanprop.topic = TT2A(channel.szTopic);
     Convert(channel.audiocfg, chanprop.audiocfg);
 
     for(int i=0;i<TT_TRANSMITUSERS_MAX && (channel.transmitUsers[i][TT_TRANSMITUSERS_USERID_INDEX] != 0);i++)
@@ -1220,12 +1222,12 @@ bool Convert(const Channel& channel, teamtalk::ChannelProp& chanprop)
 static void Convert(const teamtalk::User& srcuser, User& result)
 {
     result.nUserID = srcuser.GetUserID();
-    ACE_OS::strsncpy(result.szNickname, srcuser.GetNickname().c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szUsername, srcuser.GetUsername().c_str(), TT_STRLEN);
+    A2TT(result.szNickname, srcuser.GetNickname().c_str(), TT_STRLEN);
+    A2TT(result.szUsername, srcuser.GetUsername().c_str(), TT_STRLEN);
     result.nStatusMode = srcuser.GetStatusMode();
-    ACE_OS::strsncpy(result.szStatusMsg, srcuser.GetStatusMessage().c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szIPAddress, srcuser.GetIpAddress().c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szClientName, srcuser.GetClientName().c_str(), TT_STRLEN);
+    A2TT(result.szStatusMsg, srcuser.GetStatusMessage().c_str(), TT_STRLEN);
+    A2TT(result.szIPAddress, srcuser.GetIpAddress().c_str(), TT_STRLEN);
+    A2TT(result.szClientName, srcuser.GetClientName().c_str(), TT_STRLEN);
     strings_t tokens = Tokenize(srcuser.GetClientVersion(), ACE_TEXT("."));
     result.uVersion = 0;
     int shift = 16;
@@ -1269,7 +1271,7 @@ void Convert(const teamtalk::ClientUser& clientuser, User& result)
         result.uUserState |= USERSTATE_MEDIAFILE_VIDEO;
     if(clientuser.IsAudioActive(teamtalk::STREAMTYPE_MEDIAFILE_AUDIO))
         result.uUserState |= USERSTATE_MEDIAFILE_AUDIO;
-    ACE_OS::strsncpy(result.szMediaStorageDir, clientuser.GetAudioFolder().c_str(), TT_STRLEN);
+    A2TT(result.szMediaStorageDir, clientuser.GetAudioFolder().c_str(), TT_STRLEN);
     result.nVolumeVoice = clientuser.GetVolume(teamtalk::STREAMTYPE_VOICE);
     result.nVolumeMediaFile = clientuser.GetVolume(teamtalk::STREAMTYPE_MEDIAFILE_AUDIO);
     result.nStoppedDelayVoice = clientuser.GetPlaybackStoppedDelay(teamtalk::STREAMTYPE_VOICE);
@@ -1335,30 +1337,30 @@ void Convert(const teamtalk::UserAccount& useraccount, UserAccount& result)
 {
     ZERO_STRUCT(result);
 
-    ACE_OS::strsncpy(result.szUsername, useraccount.username.c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szPassword, useraccount.passwd.c_str(), TT_STRLEN);
+    A2TT(result.szUsername, useraccount.username.c_str(), TT_STRLEN);
+    A2TT(result.szPassword, useraccount.passwd.c_str(), TT_STRLEN);
     result.uUserType = useraccount.usertype;
     result.uUserRights = useraccount.userrights;
     result.nUserData = useraccount.userdata;
-    ACE_OS::strsncpy(result.szNote, useraccount.note.c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szInitChannel, useraccount.init_channel.c_str(), TT_STRLEN);
+    A2TT(result.szNote, useraccount.note.c_str(), TT_STRLEN);
+    A2TT(result.szInitChannel, useraccount.init_channel.c_str(), TT_STRLEN);
     Convert(useraccount.auto_op_channels, result.autoOperatorChannels, TT_CHANNELS_OPERATOR_MAX);
     result.nAudioCodecBpsLimit = useraccount.audiobpslimit;
     result.abusePrevent.nCommandsLimit = useraccount.abuse.n_cmds;
     result.abusePrevent.nCommandsIntervalMSec = useraccount.abuse.cmd_msec;
-    ACE_OS::strsncpy(result.szLastModified, teamtalk::DateToString(useraccount.lastupdated).c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szLastLoginTime, teamtalk::DateToString(useraccount.lastlogin).c_str(), TT_STRLEN);
+    A2TT(result.szLastModified, teamtalk::DateToString(useraccount.lastupdated).c_str(), TT_STRLEN);
+    A2TT(result.szLastLoginTime, teamtalk::DateToString(useraccount.lastlogin).c_str(), TT_STRLEN);
 }
 
 void Convert(const UserAccount& useraccount, teamtalk::UserAccount& result)
 {
-    result.username = useraccount.szUsername;
-    result.passwd = useraccount.szPassword;
+    result.username = TT2A(useraccount.szUsername);
+    result.passwd = TT2A(useraccount.szPassword);
     result.usertype = useraccount.uUserType;
     result.userrights = useraccount.uUserRights;
     result.userdata = useraccount.nUserData;
-    result.note = useraccount.szNote;
-    result.init_channel = useraccount.szInitChannel;
+    result.note = TT2A(useraccount.szNote);
+    result.init_channel = TT2A(useraccount.szInitChannel);
     result.audiobpslimit = useraccount.nAudioCodecBpsLimit;
     Convert(useraccount.autoOperatorChannels, TT_CHANNELS_OPERATOR_MAX, result.auto_op_channels);
     result.abuse.n_cmds = useraccount.abusePrevent.nCommandsLimit;
@@ -1371,8 +1373,8 @@ void Convert(const teamtalk::ServerProperties& srvprop, ServerProperties& result
     result.nMaxLoginAttempts = srvprop.maxloginattempts;
     result.nMaxLoginsPerIPAddress = srvprop.max_logins_per_ipaddr;
     result.nUserTimeout = srvprop.usertimeout;
-    ACE_OS::strsncpy(result.szServerName, srvprop.servername.c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szMOTD, srvprop.motd.c_str(), TT_STRLEN);
+    A2TT(result.szServerName, srvprop.servername.c_str(), TT_STRLEN);
+    A2TT(result.szMOTD, srvprop.motd.c_str(), TT_STRLEN);
     result.nMaxVoiceTxPerSecond = srvprop.voicetxlimit;
     result.nMaxVideoCaptureTxPerSecond = srvprop.videotxlimit;
     result.nMaxMediaFileTxPerSecond = srvprop.mediafiletxlimit;
@@ -1382,7 +1384,7 @@ void Convert(const teamtalk::ServerProperties& srvprop, ServerProperties& result
     result.nMaxUsers = srvprop.maxusers;
     result.nUserTimeout = srvprop.usertimeout;
     result.nLoginDelayMSec = srvprop.logindelay;
-    ACE_OS::strsncpy(result.szServerVersion, srvprop.version.c_str(), TT_STRLEN);
+    A2TT(result.szServerVersion, srvprop.version.c_str(), TT_STRLEN);
     result.uServerLogEvents = srvprop.logevents;
 }
 
@@ -1390,14 +1392,14 @@ void Convert(const teamtalk::ServerInfo& srvprop, ServerProperties& result)
 {
     ZERO_STRUCT(result);
     Convert(static_cast<const teamtalk::ServerProperties&>(srvprop), result);
-    ACE_OS::strsncpy(result.szMOTDRaw, srvprop.motd_raw.c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szServerProtocolVersion, srvprop.protocol.c_str(), TT_STRLEN);
+    A2TT(result.szMOTDRaw, srvprop.motd_raw.c_str(), TT_STRLEN);
+    A2TT(result.szServerProtocolVersion, srvprop.protocol.c_str(), TT_STRLEN);
     if (!srvprop.hostaddrs.empty())
     {
         result.nTcpPort = srvprop.hostaddrs[0].get_port_number();
         result.nUdpPort = srvprop.udpaddr.get_port_number();
     }
-    ACE_OS::strsncpy(result.szAccessToken, srvprop.accesstoken.c_str(), TT_STRLEN);
+    A2TT(result.szAccessToken, srvprop.accesstoken.c_str(), TT_STRLEN);
 }
 
 #if defined(ENABLE_TEAMTALKPRO)
@@ -1405,7 +1407,7 @@ void Convert(const teamtalk::ServerSettings& srvprop, ServerProperties& result)
 {
     ZERO_STRUCT(result);
     Convert(static_cast<const teamtalk::ServerProperties&>(srvprop), result);
-    ACE_OS::strsncpy(result.szServerProtocolVersion, TEAMTALK_PROTOCOL_VERSION, TT_STRLEN);
+    A2TT(result.szServerProtocolVersion, TEAMTALK_PROTOCOL_VERSION, TT_STRLEN);
 
     if (!srvprop.tcpaddrs.empty())
         result.nTcpPort = srvprop.tcpaddrs[0].get_port_number();
@@ -1416,8 +1418,8 @@ void Convert(const teamtalk::ServerSettings& srvprop, ServerProperties& result)
 
 void Convert(const ServerProperties& srvprop, teamtalk::ServerProperties& result)
 {
-    result.servername = srvprop.szServerName;
-    result.motd = srvprop.szMOTD;
+    result.servername = TT2A(srvprop.szServerName);
+    result.motd = TT2A(srvprop.szMOTD);
     result.maxusers = srvprop.nMaxUsers;
     result.maxloginattempts = srvprop.nMaxLoginAttempts;
     result.max_logins_per_ipaddr = srvprop.nMaxLoginsPerIPAddress;
@@ -1441,8 +1443,8 @@ void Convert(const ServerProperties& srvprop, teamtalk::ServerInfo& result)
         result.hostaddrs[0].set_port_number(srvprop.nTcpPort);
         result.udpaddr.set_port_number(srvprop.nUdpPort);
     }
-    result.motd_raw = srvprop.szMOTDRaw;
-    result.accesstoken = srvprop.szAccessToken;
+    result.motd_raw = TT2A(srvprop.szMOTDRaw);
+    result.accesstoken = TT2A(srvprop.szAccessToken);
 }
 
 #if defined(ENABLE_TEAMTALKPRO)
@@ -1461,14 +1463,14 @@ ClientErrorMsg& Convert(const teamtalk::ErrorMsg& cmderr, ClientErrorMsg& result
 {
     ZERO_STRUCT(result);
 
-    ACE_OS::strsncpy(result.szErrorMsg, cmderr.errmsg.c_str(), TT_STRLEN);
+    A2TT(result.szErrorMsg, cmderr.errmsg.c_str(), TT_STRLEN);
     result.nErrorNo = cmderr.errorno;
     return result;
 }
 
 teamtalk::ErrorMsg& Convert(const ClientErrorMsg& cmderr, teamtalk::ErrorMsg& result)
 {
-    result.errmsg = cmderr.szErrorMsg;
+    result.errmsg = TT2A(cmderr.szErrorMsg);
     result.errorno = cmderr.nErrorNo;
     return result;
 }
@@ -1477,23 +1479,23 @@ void Convert(const teamtalk::BannedUser& banuser, BannedUser& result)
 {
     ZERO_STRUCT(result);
 
-    ACE_OS::strsncpy(result.szChannelPath, banuser.chanpath.c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szIPAddress, banuser.ipaddr.c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szNickname, banuser.nickname.c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szUsername, banuser.username.c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szBanTime, teamtalk::DateToString( banuser.bantime ).c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szOwner, banuser.owner.c_str(), TT_STRLEN);
+    A2TT(result.szChannelPath, banuser.chanpath.c_str(), TT_STRLEN);
+    A2TT(result.szIPAddress, banuser.ipaddr.c_str(), TT_STRLEN);
+    A2TT(result.szNickname, banuser.nickname.c_str(), TT_STRLEN);
+    A2TT(result.szUsername, banuser.username.c_str(), TT_STRLEN);
+    A2TT(result.szBanTime, teamtalk::DateToString( banuser.bantime ).c_str(), TT_STRLEN);
+    A2TT(result.szOwner, banuser.owner.c_str(), TT_STRLEN);
     result.uBanTypes = BanTypes(banuser.bantype);
 }
 
 void Convert(const BannedUser& banuser, teamtalk::BannedUser& result)
 {
     result.bantype = teamtalk::BanTypes(banuser.uBanTypes);
-    result.chanpath = banuser.szChannelPath;
-    result.ipaddr = banuser.szIPAddress;
-    result.nickname = banuser.szNickname;
-    result.username = banuser.szUsername;
-    result.owner = banuser.szOwner;
+    result.chanpath = TT2A(banuser.szChannelPath);
+    result.ipaddr = TT2A(banuser.szIPAddress);
+    result.nickname = TT2A(banuser.szNickname);
+    result.username = TT2A(banuser.szUsername);
+    result.owner = TT2A(banuser.szOwner);
 }
 
 void Convert(const teamtalk::FileTransfer& transfer, FileTransfer& result)
@@ -1501,12 +1503,12 @@ void Convert(const teamtalk::FileTransfer& transfer, FileTransfer& result)
     ZERO_STRUCT(result);
 
     result.nStatus = (FileTransferStatus)transfer.status;
-    ACE_OS::strsncpy(result.szLocalFilePath, transfer.localfile.c_str(), TT_STRLEN);
+    A2TT(result.szLocalFilePath, transfer.localfile.c_str(), TT_STRLEN);
     result.nTransferID = transfer.transferid;
     result.nFileSize = transfer.filesize;
     result.nTransferred = transfer.transferred;
     result.bInbound = static_cast<TTBOOL>(transfer.inbound);
-    ACE_OS::strsncpy(result.szRemoteFileName, transfer.filename.c_str(), TT_STRLEN);
+    A2TT(result.szRemoteFileName, transfer.filename.c_str(), TT_STRLEN);
     result.nChannelID = transfer.channelid;
 }
 
@@ -1514,22 +1516,22 @@ void Convert(const teamtalk::RemoteFile& remotefile, RemoteFile& result)
 {
     ZERO_STRUCT(result);
 
-    ACE_OS::strsncpy(result.szFileName, remotefile.filename.c_str(), TT_STRLEN);
-    ACE_OS::strsncpy(result.szUsername,  remotefile.username.c_str(), TT_STRLEN);
+    A2TT(result.szFileName, remotefile.filename.c_str(), TT_STRLEN);
+    A2TT(result.szUsername,  remotefile.username.c_str(), TT_STRLEN);
     result.nFileID = remotefile.fileid;
     result.nFileSize = remotefile.filesize;
     result.nChannelID = remotefile.channelid;
-    ACE_OS::strsncpy(result.szUploadTime, teamtalk::DateToString(remotefile.uploadtime).c_str(), TT_STRLEN);
+    A2TT(result.szUploadTime, teamtalk::DateToString(remotefile.uploadtime).c_str(), TT_STRLEN);
 }
 
 void Convert(const RemoteFile& remotefile, const TTCHAR* szPath, teamtalk::RemoteFile& result)
 {
     result.channelid = remotefile.nChannelID;
     result.fileid = remotefile.nFileID;
-    result.filename = remotefile.szFileName;
+    result.filename = TT2A(remotefile.szFileName);
     result.filesize = remotefile.nFileSize;
-    result.internalname = szPath;
-    result.username = remotefile.szUsername;
+    result.internalname = TT2A(szPath);
+    result.username = TT2A(remotefile.szUsername);
     // TODO: result.uploadtime = teamtalk::StringToDate(remotefile.szUploadTime);
 }
 
@@ -1561,9 +1563,9 @@ void Convert(const teamtalk::TextMessage& txtmsg, TextMessage& result)
     ZERO_STRUCT(result);
 
     result.nMsgType = (TextMsgType)txtmsg.msgType;
-    ACE_OS::strsncpy(result.szMessage, txtmsg.content.c_str(), TT_STRLEN);
+    A2TT(result.szMessage, txtmsg.content.c_str(), TT_STRLEN);
     result.nFromUserID = txtmsg.from_userid;
-    ACE_OS::strsncpy(result.szFromUsername, txtmsg.from_username.c_str(), TT_STRLEN);
+    A2TT(result.szFromUsername, txtmsg.from_username.c_str(), TT_STRLEN);
     result.nToUserID = txtmsg.to_userid;
     result.nChannelID = txtmsg.channelid;
     result.bMore = static_cast<TTBOOL>(txtmsg.more);
@@ -1574,7 +1576,7 @@ void Convert(const TextMessage& txtmsg, teamtalk::TextMessage& result)
     result.msgType = (teamtalk::MsgType)txtmsg.nMsgType;
     result.from_userid = txtmsg.nFromUserID;
     result.to_userid = txtmsg.nToUserID;
-    result.content = txtmsg.szMessage;
+    result.content = TT2A(txtmsg.szMessage);
     result.channelid = txtmsg.nChannelID;
     result.more = (txtmsg.bMore != 0);
 }
@@ -1604,7 +1606,7 @@ void Convert(const MediaFileProp& mediaprop, MediaFileInfo& result)
         result.videoFmt.picFourCC = FOURCC_NONE;
     result.uDurationMSec = mediaprop.duration_ms;
     result.uElapsedMSec = mediaprop.elapsed_ms;
-    ACE_OS::strsncpy(result.szFileName, mediaprop.filename.c_str(), TT_STRLEN);
+    A2TT(result.szFileName, mediaprop.filename.c_str(), TT_STRLEN);
 }
 
 void Convert(teamtalk::MediaFileStatus status, const teamtalk::VoiceLogFile& vlog,
@@ -1618,7 +1620,7 @@ void Convert(teamtalk::MediaFileStatus status, const teamtalk::VoiceLogFile& vlo
     result.audioFmt.nSampleRate = vlog.samplerate;
     result.uDurationMSec = vlog.duration;
     result.uElapsedMSec = 0;
-    ACE_OS::strsncpy(result.szFileName, vlog.filename.c_str(), TT_STRLEN);
+    A2TT(result.szFileName, vlog.filename.c_str(), TT_STRLEN);
     ACE_OS::memset(&result.videoFmt, 0, sizeof(result.videoFmt));
 }
 
@@ -1780,6 +1782,11 @@ bool SetupEncryptionContext(const EncryptionContext& enccontext, ACE_SSL_Context
     ACE_CString priv = UnicodeToLocal(enccontext.szPrivateKeyFile);
     ACE_CString cafile = UnicodeToLocal(enccontext.szCAFile);
     ACE_CString cadir = UnicodeToLocal(enccontext.szCADir);
+#elif defined(WIN32)
+    ACE_CString const cert = TT2A(enccontext.szCertificateFile);
+    ACE_CString const priv = TT2A(enccontext.szPrivateKeyFile);
+    ACE_CString const cafile = TT2A(enccontext.szCAFile);
+    ACE_CString const cadir = TT2A(enccontext.szCADir);
 #else
     ACE_CString const cert = enccontext.szCertificateFile;
     ACE_CString const priv = enccontext.szPrivateKeyFile;

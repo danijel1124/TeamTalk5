@@ -773,7 +773,9 @@ QString PasswordDialog::getPassword() const
     return passEdit->text();
 }
 
-#if defined(Q_OS_WIN)
+// WinToast requires WinRT headers (<wrl/implements.h>, <windows.ui.notifications.h>)
+// which are only available in the MSVC Windows SDK, not in MinGW.
+#if defined(Q_OS_WIN) && defined(_MSC_VER)
 #include "3rdparty/WinToast/wintoastlib.h"
 #include <Windows.h>
 
@@ -847,6 +849,10 @@ void showNotification(const QString &title, const QString &message)
     if (WinToast::instance()->showToast(templ, new CustomHandler()) < 0) {
         return;
     }
+}
+#elif defined(Q_OS_WIN)
+void showNotification(const QString& /*title*/, const QString& /*message*/)
+{
 }
 #elif defined(Q_OS_LINUX)
 void showNotification(const QString &title, const QString &message)

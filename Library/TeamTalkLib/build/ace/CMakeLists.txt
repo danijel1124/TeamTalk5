@@ -126,6 +126,93 @@ if (MSVC)
     IMPORTED_LOCATION ${INSTALL_DIR}/lib/ACE_INet_SSLs.lib)
   target_link_libraries(ace_inet_ssl INTERFACE ace_inet ace_ssl)
 
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  # Windows MinGW cross-compile
+
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    ExternalProject_Add(MPC
+      GIT_REPOSITORY    https://github.com/DOCGroup/MPC.git
+      GIT_TAG           ACE+TAO-8_0_5
+      UPDATE_COMMAND    ""
+      PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/MPC
+      CONFIGURE_COMMAND ""
+      BUILD_COMMAND     ""
+      INSTALL_COMMAND   ""
+      )
+    ExternalProject_Get_Property(MPC SOURCE_DIR)
+    set (MPC_DIR ${SOURCE_DIR})
+
+    ExternalProject_Add(ACE-src
+      GIT_REPOSITORY    https://github.com/DOCGroup/ACE_TAO.git
+      GIT_TAG           ACE+TAO-8_0_5
+      INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_ACE}
+      UPDATE_COMMAND    ""
+      PATCH_COMMAND     git reset --hard
+      COMMAND           git apply ${CMAKE_CURRENT_LIST_DIR}/0002-Enable-SNI-for-TLS.patch
+      COMMAND           git apply ${CMAKE_CURRENT_LIST_DIR}/0004-Fix-memory-leak-in-ACE-HTTPS-Session_T.patch
+      PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/ace
+      # Create 'platform_macros.GNU' for MinGW cross-compile
+      CONFIGURE_COMMAND echo "shared_libs=0" > <SOURCE_DIR>/ACE/include/makeinclude/platform_macros.GNU
+      COMMAND           echo "static_libs_only=1" >> <SOURCE_DIR>/ACE/include/makeinclude/platform_macros.GNU
+      COMMAND           echo "ssl=1" >> <SOURCE_DIR>/ACE/include/makeinclude/platform_macros.GNU
+      COMMAND           echo "ipv6=1" >> <SOURCE_DIR>/ACE/include/makeinclude/platform_macros.GNU
+      COMMAND           echo "c++17=1" >> <SOURCE_DIR>/ACE/include/makeinclude/platform_macros.GNU
+      COMMAND           echo "CROSS_COMPILE=x86_64-w64-mingw32-" >> <SOURCE_DIR>/ACE/include/makeinclude/platform_macros.GNU
+      COMMAND           echo "include <SOURCE_DIR>/ACE/include/makeinclude/platform_mingw32.GNU" >> <SOURCE_DIR>/ACE/include/makeinclude/platform_macros.GNU
+      COMMAND           echo "SSL_ROOT=${OPENSSL_DIR}" >> <SOURCE_DIR>/ACE/include/makeinclude/platform_macros.GNU
+      COMMAND           echo "CCFLAGS+=-fpermissive" >> <SOURCE_DIR>/ACE/include/makeinclude/platform_macros.GNU
+      COMMAND           echo "INSTALL_PREFIX=<INSTALL_DIR>" >> <SOURCE_DIR>/ACE/include/makeinclude/platform_macros.GNU
+      # Create 'config.h'
+      COMMAND           echo "#define ACE_AS_STATIC_LIBS 1" > <SOURCE_DIR>/ACE/ace/config.h
+      COMMAND           echo "#define ACE_HAS_IPV6 1" >> <SOURCE_DIR>/ACE/ace/config.h
+      COMMAND           echo "#define ACE_HAS_CPP17" >> <SOURCE_DIR>/ACE/ace/config.h
+      COMMAND           echo "#include \"ace/config-win32.h\"" >> <SOURCE_DIR>/ACE/ace/config.h
+      # Setup MPC
+      COMMAND           ln -sf ${MPC_DIR} <SOURCE_DIR>/ACE/MPC
+      # Generate build configuration for ACE
+      COMMAND           export ACE_ROOT=<SOURCE_DIR>/ACE && cd <SOURCE_DIR>/ACE/ace && <SOURCE_DIR>/ACE/bin/mwc.pl -type gnuace -recurse
+      # Generate build configuration for protocols (INet)
+      COMMAND           export ACE_ROOT=<SOURCE_DIR>/ACE && cd <SOURCE_DIR>/ACE/protocols/ace/INet && <SOURCE_DIR>/ACE/bin/mwc.pl -type gnuace -recurse
+      BUILD_IN_SOURCE   TRUE
+      BUILD_COMMAND     export ACE_ROOT=<SOURCE_DIR>/ACE && cd <SOURCE_DIR>/ACE/ace && make ${TOOLCHAIN_BUILD_MAKEJOBS}
+      COMMAND           export ACE_ROOT=<SOURCE_DIR>/ACE && cd <SOURCE_DIR>/ACE/protocols/ace/INet && make ${TOOLCHAIN_BUILD_MAKEJOBS}
+      INSTALL_COMMAND   export ACE_ROOT=<SOURCE_DIR>/ACE && cd <SOURCE_DIR>/ACE/ace && make ${TOOLCHAIN_BUILD_MAKEJOBS} install
+      COMMAND           export ACE_ROOT=<SOURCE_DIR>/ACE && cd <SOURCE_DIR>/ACE/protocols/ace/INet && make ${TOOLCHAIN_BUILD_MAKEJOBS} install
+      DEPENDS           MPC openssl-src
+      BUILD_BYPRODUCTS  <INSTALL_DIR>/lib/libACE.a
+      <INSTALL_DIR>/lib/libACE_SSL.a
+      <INSTALL_DIR>/lib/libACE_INet.a
+      <INSTALL_DIR>/lib/libACE_INet_SSL.a
+      )
+    ExternalProject_Get_Property(ACE-src INSTALL_DIR)
+    file(MAKE_DIRECTORY ${INSTALL_DIR}/include)
+  else()
+    set (INSTALL_DIR ${TOOLCHAIN_INSTALL_PREFIX_ACE})
+  endif(TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+
+  add_library(ace STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(ace ACE-src)
+  endif()
+  target_include_directories (ace INTERFACE ${INSTALL_DIR}/include)
+  set_target_properties(ace PROPERTIES
+    IMPORTED_LOCATION ${INSTALL_DIR}/lib/libACE.a)
+
+  add_library(ace_ssl STATIC IMPORTED GLOBAL)
+  set_target_properties(ace_ssl PROPERTIES
+    IMPORTED_LOCATION ${INSTALL_DIR}/lib/libACE_SSL.a)
+  target_link_libraries(ace_ssl INTERFACE ace openssl-ssl openssl-crypto)
+
+  add_library(ace_inet STATIC IMPORTED GLOBAL)
+  set_target_properties(ace_inet PROPERTIES
+    IMPORTED_LOCATION ${INSTALL_DIR}/lib/libACE_INet.a)
+  target_link_libraries(ace_inet INTERFACE ace)
+
+  add_library(ace_inet_ssl STATIC IMPORTED GLOBAL)
+  set_target_properties(ace_inet_ssl PROPERTIES
+    IMPORTED_LOCATION ${INSTALL_DIR}/lib/libACE_INet_SSL.a)
+  target_link_libraries(ace_inet_ssl INTERFACE ace_inet ace_ssl)
+
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
   if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)

@@ -40,6 +40,38 @@ if (MSVC)
     IMPORTED_LOCATION_DEBUG ${INSTALL_DIR}/lib/opusd.lib
     IMPORTED_LOCATION ${INSTALL_DIR}/lib/opus.lib)
 
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  # Windows MinGW cross-compile
+
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    ExternalProject_Add(opus-src
+      GIT_REPOSITORY    https://github.com/xiph/opus.git
+      GIT_TAG           v1.6.1
+      GIT_SHALLOW       TRUE
+      UPDATE_COMMAND    ""
+      PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/opus
+      INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_OPUS}
+      CMAKE_ARGS        -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+                        -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+                        -DCMAKE_BUILD_TYPE=release
+                        -DOPUS_INSTALL_PKG_CONFIG_MODULE=OFF
+      BUILD_COMMAND     ${CMAKE_COMMAND} --build . --target opus
+      BUILD_BYPRODUCTS  <INSTALL_DIR>/lib/libopus.a
+      )
+    ExternalProject_Get_Property(opus-src INSTALL_DIR)
+    file(MAKE_DIRECTORY ${INSTALL_DIR}/include)
+  else()
+    set (INSTALL_DIR ${TOOLCHAIN_INSTALL_PREFIX_OPUS})
+  endif()
+
+  add_library(opus STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(opus opus-src)
+  endif()
+  target_include_directories (opus INTERFACE ${INSTALL_DIR}/include)
+  set_target_properties(opus PROPERTIES
+    IMPORTED_LOCATION ${INSTALL_DIR}/lib/libopus.a)
+
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
   if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)

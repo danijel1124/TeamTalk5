@@ -348,6 +348,114 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
   set_property(TARGET ffmpeg-avutil PROPERTY IMPORTED_LOCATION
     ${INSTALL_DIR}/lib/libavutil.a)
 
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  # Windows MinGW cross-compile
+
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    ExternalProject_Add(ffmpeg-src
+      GIT_REPOSITORY    https://github.com/FFmpeg/FFmpeg.git
+      GIT_TAG           n8.0.1
+      GIT_SHALLOW       TRUE
+      UPDATE_COMMAND    ""
+      PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/ffmpeg
+      INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_FFMPEG}
+      CONFIGURE_COMMAND ln -sf ${TOOLCHAIN_INSTALL_PREFIX}/zlib/lib/libzs.a ${TOOLCHAIN_INSTALL_PREFIX}/zlib/lib/libz.a &&
+                        export PKG_CONFIG_PATH=${TOOLCHAIN_INSTALL_PREFIX}/openssl/lib/pkgconfig:${TOOLCHAIN_INSTALL_PREFIX}/zlib/lib/pkgconfig && <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
+      # Cross-compile settings
+      --cross-prefix=x86_64-w64-mingw32-
+      --target-os=mingw32
+      --arch=x86_64
+      --enable-cross-compile
+      # Programs/docs
+      --disable-doc
+      --disable-programs
+      # Minimal build
+      --disable-autodetect
+      --enable-openssl
+      --enable-zlib
+      # Compile options
+      --disable-debug
+      --pkg-config-flags=--static
+      --extra-cflags=-I${TOOLCHAIN_INSTALL_PREFIX}/openssl/include\ -I${TOOLCHAIN_INSTALL_PREFIX}/zlib/include
+      --extra-ldflags=-L${TOOLCHAIN_INSTALL_PREFIX}/openssl/lib\ -L${TOOLCHAIN_INSTALL_PREFIX}/zlib/lib
+      BUILD_COMMAND     make ${TOOLCHAIN_BUILD_MAKEJOBS}
+      INSTALL_COMMAND   make ${TOOLCHAIN_BUILD_MAKEJOBS} install
+      BUILD_BYPRODUCTS  <INSTALL_DIR>/lib/libavdevice.a
+      <INSTALL_DIR>/lib/libavfilter.a
+      <INSTALL_DIR>/lib/libavformat.a
+      <INSTALL_DIR>/lib/libavcodec.a
+      <INSTALL_DIR>/lib/libswresample.a
+      <INSTALL_DIR>/lib/libswscale.a
+      <INSTALL_DIR>/lib/libavutil.a
+      DEPENDS openssl-src
+      )
+    ExternalProject_Get_Property(ffmpeg-src INSTALL_DIR)
+    file(MAKE_DIRECTORY ${INSTALL_DIR}/include)
+  else()
+    set (INSTALL_DIR ${TOOLCHAIN_INSTALL_PREFIX_FFMPEG})
+  endif()
+
+  set(FFMPEG_LINK bcrypt ws2_32 secur32 strmiids ole32 user32 shlwapi)
+
+  add_library(ffmpeg-avdevice STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(ffmpeg-avdevice ffmpeg-src)
+  endif()
+  target_include_directories (ffmpeg-avdevice INTERFACE ${INSTALL_DIR}/include)
+  set_target_properties(ffmpeg-avdevice PROPERTIES
+    INTERFACE_COMPILE_OPTIONS -D__STDC_CONSTANT_MACROS
+    IMPORTED_LOCATION ${INSTALL_DIR}/lib/libavdevice.a)
+  target_link_libraries(ffmpeg-avdevice INTERFACE ${FFMPEG_LINK})
+
+  add_library(ffmpeg-avfilter STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(ffmpeg-avfilter ffmpeg-src)
+  endif()
+  target_include_directories (ffmpeg-avfilter INTERFACE ${INSTALL_DIR}/include)
+  set_property(TARGET ffmpeg-avfilter PROPERTY IMPORTED_LOCATION
+    ${INSTALL_DIR}/lib/libavfilter.a)
+
+  add_library(ffmpeg-avformat STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(ffmpeg-avformat ffmpeg-src)
+  endif()
+  target_include_directories (ffmpeg-avformat INTERFACE ${INSTALL_DIR}/include)
+  set_property(TARGET ffmpeg-avformat PROPERTY IMPORTED_LOCATION
+    ${INSTALL_DIR}/lib/libavformat.a)
+  target_link_libraries(ffmpeg-avformat INTERFACE openssl-crypto openssl-ssl)
+
+  add_library(ffmpeg-avcodec STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(ffmpeg-avcodec ffmpeg-src)
+  endif()
+  target_include_directories (ffmpeg-avcodec INTERFACE ${INSTALL_DIR}/include)
+  set_property(TARGET ffmpeg-avcodec PROPERTY IMPORTED_LOCATION
+    ${INSTALL_DIR}/lib/libavcodec.a)
+
+  add_library(ffmpeg-swresample STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(ffmpeg-swresample ffmpeg-src)
+  endif()
+  target_include_directories (ffmpeg-swresample INTERFACE ${INSTALL_DIR}/include)
+  set_property(TARGET ffmpeg-swresample PROPERTY IMPORTED_LOCATION
+    ${INSTALL_DIR}/lib/libswresample.a)
+
+  add_library(ffmpeg-swscale STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(ffmpeg-swscale ffmpeg-src)
+  endif()
+  target_include_directories (ffmpeg-swscale INTERFACE ${INSTALL_DIR}/include)
+  set_property(TARGET ffmpeg-swscale PROPERTY IMPORTED_LOCATION
+    ${INSTALL_DIR}/lib/libswscale.a)
+
+  add_library(ffmpeg-avutil STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(ffmpeg-avutil ffmpeg-src)
+  endif()
+  target_include_directories (ffmpeg-avutil INTERFACE ${INSTALL_DIR}/include)
+  set_property(TARGET ffmpeg-avutil PROPERTY IMPORTED_LOCATION
+    ${INSTALL_DIR}/lib/libavutil.a)
+
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 
   if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)

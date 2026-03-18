@@ -65,6 +65,49 @@ if (MSVC)
   target_link_libraries(openssl-ssl INTERFACE crypt32.lib)
   set_property(TARGET openssl-ssl PROPERTY IMPORTED_LOCATION ${INSTALL_DIR}/lib/libssl.lib)
 
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  # Windows MinGW cross-compile
+
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    ExternalProject_Add(openssl-src
+      GIT_REPOSITORY    https://github.com/openssl/openssl.git
+      GIT_TAG           openssl-3.6.1
+      GIT_SHALLOW       TRUE
+      UPDATE_COMMAND    ""
+      PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/openssl
+      INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_OPENSSL}
+      CONFIGURE_COMMAND <SOURCE_DIR>/Configure --prefix=<INSTALL_DIR> --libdir=lib
+                        no-shared no-tests no-apps no-docs no-quic
+                        mingw64 --cross-compile-prefix=x86_64-w64-mingw32-
+      BUILD_COMMAND     make ${TOOLCHAIN_BUILD_MAKEJOBS}
+      INSTALL_COMMAND   make ${TOOLCHAIN_BUILD_MAKEJOBS} install_sw
+      BUILD_BYPRODUCTS  <INSTALL_DIR>/lib/libcrypto.a <INSTALL_DIR>/lib/libssl.a
+      )
+    ExternalProject_Get_Property(openssl-src INSTALL_DIR)
+    file(MAKE_DIRECTORY ${INSTALL_DIR}/include)
+    file(MAKE_DIRECTORY ${INSTALL_DIR}/lib)
+  else()
+    set (INSTALL_DIR ${TOOLCHAIN_INSTALL_PREFIX_OPENSSL})
+  endif(TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+
+  set (OPENSSL_DIR ${INSTALL_DIR} PARENT_SCOPE)
+
+  add_library(openssl-crypto STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(openssl-crypto openssl-src)
+  endif()
+  target_include_directories (openssl-crypto INTERFACE ${INSTALL_DIR}/include)
+  target_link_libraries(openssl-crypto INTERFACE ws2_32 crypt32 iphlpapi)
+  set_property(TARGET openssl-crypto PROPERTY IMPORTED_LOCATION ${INSTALL_DIR}/lib/libcrypto.a)
+
+  add_library(openssl-ssl STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(openssl-ssl openssl-src)
+  endif()
+  target_include_directories (openssl-ssl INTERFACE ${INSTALL_DIR}/include)
+  target_link_libraries(openssl-ssl INTERFACE ws2_32 crypt32 iphlpapi)
+  set_property(TARGET openssl-ssl PROPERTY IMPORTED_LOCATION ${INSTALL_DIR}/lib/libssl.a)
+
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
   if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)

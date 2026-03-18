@@ -30,7 +30,15 @@
 #include <ace/OS.h>
 
 #include <wmcodecdsp.h>
+// dmort.h lacks extern "C" guards, causing C++ name-mangling that breaks
+// linking against libmsdmo.a (which exports plain C symbols).
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <dmort.h>
+#ifdef __cplusplus
+}
+#endif
 
 
 enum SampleFormat

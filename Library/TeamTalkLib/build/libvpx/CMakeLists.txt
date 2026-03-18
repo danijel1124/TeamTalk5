@@ -105,6 +105,44 @@ if (MSVC)
     add_dependencies(libvpx libvpx-src)
   endif()
 
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  # Windows MinGW cross-compile
+
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    ExternalProject_Add(libvpx-src
+      GIT_REPOSITORY    https://github.com/webmproject/libvpx.git
+      GIT_TAG           v1.16.0
+      GIT_SHALLOW       TRUE
+      UPDATE_COMMAND    ""
+      PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/libvpx
+      INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX}/libvpx
+      CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
+                        CC=x86_64-w64-mingw32-gcc
+                        CXX=x86_64-w64-mingw32-g++
+                        AR=x86_64-w64-mingw32-ar
+                        LD=x86_64-w64-mingw32-ld
+                        <SOURCE_DIR>/configure
+                        --prefix=<INSTALL_DIR>
+                        --target=x86_64-win64-gcc
+                        --disable-examples --disable-docs --disable-unit-tests
+      BUILD_COMMAND     make ${TOOLCHAIN_BUILD_MAKEJOBS}
+      INSTALL_COMMAND   make ${TOOLCHAIN_BUILD_MAKEJOBS} install
+      BUILD_BYPRODUCTS  <INSTALL_DIR>/lib/libvpx.a
+      )
+    ExternalProject_Get_Property(libvpx-src INSTALL_DIR)
+    file(MAKE_DIRECTORY ${INSTALL_DIR}/include)
+  else()
+    set (INSTALL_DIR ${TOOLCHAIN_INSTALL_PREFIX_LIBVPX})
+  endif(TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+
+  add_library(libvpx STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(libvpx libvpx-src)
+  endif()
+  target_include_directories (libvpx INTERFACE ${INSTALL_DIR}/include)
+  set_target_properties(libvpx PROPERTIES
+    IMPORTED_LOCATION ${INSTALL_DIR}/lib/libvpx.a)
+
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
   if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)

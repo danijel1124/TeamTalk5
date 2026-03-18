@@ -67,6 +67,38 @@ if (MSVC)
     IMPORTED_LOCATION_DEBUG ${INSTALL_DIR}/lib/zlibstatic.lib
     IMPORTED_LOCATION ${INSTALL_DIR}/lib/zlibstatic.lib)
 
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  # Windows MinGW cross-compile
+
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    ExternalProject_Add(zlib-src
+      GIT_REPOSITORY    https://github.com/madler/zlib.git
+      GIT_TAG           v1.3.2
+      GIT_SHALLOW       TRUE
+      UPDATE_COMMAND    ""
+      PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/zlib
+      INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX}/zlib
+      CMAKE_ARGS        -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+                        -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+                        -DCMAKE_BUILD_TYPE=release
+                        -DZLIB_BUILD_TESTING=OFF
+                        -DZLIB_BUILD_SHARED=OFF
+      BUILD_BYPRODUCTS  <INSTALL_DIR>/lib/libz.a
+      )
+    ExternalProject_Get_Property(zlib-src INSTALL_DIR)
+    file(MAKE_DIRECTORY ${INSTALL_DIR}/include)
+  else()
+    set (INSTALL_DIR ${TOOLCHAIN_INSTALL_PREFIX_ZLIB})
+  endif()
+
+  add_library(zlib STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(zlib zlib-src)
+  endif()
+  target_include_directories (zlib INTERFACE ${INSTALL_DIR}/include)
+  set_target_properties(zlib PROPERTIES
+    IMPORTED_LOCATION ${INSTALL_DIR}/lib/libz.a)
+
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
   if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)

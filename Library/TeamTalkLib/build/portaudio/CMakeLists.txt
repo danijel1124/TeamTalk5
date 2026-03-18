@@ -41,6 +41,47 @@ if (MSVC)
     IMPORTED_LOCATION_DEBUG ${INSTALL_DIR}/lib/portaudiod.lib
     IMPORTED_LOCATION ${INSTALL_DIR}/lib/portaudio.lib)
 
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+  # Windows MinGW cross-compile
+
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    ExternalProject_Add(portaudio-src
+      GIT_REPOSITORY    https://github.com/PortAudio/portaudio.git
+      GIT_TAG           213c048
+      UPDATE_COMMAND    ""
+      PATCH_COMMAND     git reset --hard
+      COMMAND           git apply ${CMAKE_CURRENT_LIST_DIR}/0001-Add-uniqueID-to-PaDeviceInfo-that-identifies-sound-d.patch
+      COMMAND           git apply ${CMAKE_CURRENT_LIST_DIR}/0002-Allow-MT-option-for-static-library-and-append-d-to-d.patch
+      PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/portaudio
+      INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_PORTAUDIO}
+      CMAKE_ARGS        -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+                        -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+                        -DCMAKE_BUILD_TYPE=release
+                        -DPA_BUILD_SHARED_LIBS=OFF
+                        -DPA_USE_ASIO=OFF
+                        -DPA_USE_DS=OFF
+                        -DPA_USE_WDMKS=OFF
+                        -DPA_USE_WDMKS_DEVICE_INFO=OFF
+                        -DPA_USE_WMME=ON
+                        -DPA_USE_WASAPI=ON
+      BUILD_COMMAND     ${CMAKE_COMMAND} --build .
+      BUILD_BYPRODUCTS  <INSTALL_DIR>/lib/libportaudio.a
+      )
+    ExternalProject_Get_Property(portaudio-src INSTALL_DIR)
+    file(MAKE_DIRECTORY ${INSTALL_DIR}/include)
+  else()
+    set (INSTALL_DIR ${TOOLCHAIN_INSTALL_PREFIX_PORTAUDIO})
+  endif()
+
+  add_library(portaudio STATIC IMPORTED GLOBAL)
+  if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+    add_dependencies(portaudio portaudio-src)
+  endif()
+  target_include_directories (portaudio INTERFACE ${INSTALL_DIR}/include)
+  set_target_properties(portaudio PROPERTIES
+    IMPORTED_LOCATION ${INSTALL_DIR}/lib/libportaudio.a)
+  target_link_libraries(portaudio INTERFACE winmm)
+
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
   if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)

@@ -19,6 +19,13 @@
 #include "license.h"
 #include "appinfo.h"
 
+// The host rcc (Linux) emits a reference to qResourceFeatureZstd() for
+// non-ELF targets (Windows PE), but the Windows Qt6Core may not export it
+// when built without zstd. Provide a stub that signals "no zstd".
+#if defined(Q_OS_WIN) && !defined(_MSC_VER)
+unsigned char qResourceFeatureZstd() { return 0; }
+#endif
+
 #include <QAbstractNativeEventFilter>
 #include <QApplication>
 #include <QColor>

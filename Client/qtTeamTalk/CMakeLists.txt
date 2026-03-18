@@ -26,7 +26,8 @@ endif()
 # TextToSpeech was introduced in Qt 6.4
 find_package (Qt6 COMPONENTS Widgets Xml Network Multimedia TextToSpeech)
 
-if (WIN32)
+# WinToast requires WinRT headers unavailable in MinGW — MSVC only.
+if (WIN32 AND MSVC)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/WinToast)
   set(WINTOAST_SOURCES
     3rdparty/WinToast/wintoastlib.cpp 3rdparty/WinToast/wintoastlib.h
@@ -237,7 +238,11 @@ endif()
         MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist)
       target_link_options(${TEAMTALK_TARGET} PRIVATE -sectcreate __TEXT __info_plist ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist)
     else()
-      add_executable (${TEAMTALK_TARGET} ${QTTEAMTALK_SOURCES})
+      if (WIN32)
+        add_executable (${TEAMTALK_TARGET} WIN32 ${QTTEAMTALK_SOURCES})
+      else()
+        add_executable (${TEAMTALK_TARGET} ${QTTEAMTALK_SOURCES})
+      endif()
     endif()
 
     if (BUILD_TEAMTALK_LIBRARY_DLL)
