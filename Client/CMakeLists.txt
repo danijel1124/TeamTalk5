@@ -1,12 +1,13 @@
 project (TeamTalkClients)
 
-if (MSVC)
-
+if (WIN32)
   option (BUILD_TEAMTALK_CLIENT_TOLK "Build TeamTalk clients with Tolk" ON)
   if (BUILD_TEAMTALK_CLIENT_TOLK)
     add_subdirectory (Tolk)
   endif()
+endif()
 
+if (MSVC)
   add_subdirectory (TeamTalkClassic)
   if (CMAKE_CSharp_COMPILER)
     add_subdirectory (TeamTalkApp.NET)

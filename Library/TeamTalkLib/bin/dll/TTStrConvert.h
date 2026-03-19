@@ -23,11 +23,8 @@ static inline ACE_TString TT2A(const TTCHAR* src)
     return ACE_TString(s.c_str());
 }
 #else
+// On Linux TTCHAR == char, so only one overload needed
 static inline void A2TT(TTCHAR* dst, const char* src, size_t len)
-{
-    ACE_OS::strsncpy(dst, src, len);
-}
-static inline void A2TT(TTCHAR* dst, const TTCHAR* src, size_t len)
 {
     ACE_OS::strsncpy(dst, src, len);
 }

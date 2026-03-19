@@ -88,6 +88,13 @@ HINSTANCE hInstance = NULL;
 #pragma message("Compiling TeamTalk version " TEAMTALK_VERSION " = " TEAMTALK_VERSION)
 #endif
 
+// TTCHAR is wchar_t on Windows, char on Linux — ACE_TEXT always expands to narrow.
+#if defined(WIN32)
+#define TTSTR(s) L##s
+#else
+#define TTSTR(s) s
+#endif
+
 using teamtalk::files_t;
 using teamtalk::BMPPalette;
 using teamtalk::ClientNode;
@@ -1308,7 +1315,7 @@ TEAMTALKDLL_API TTBOOL TT_Connect(IN TTInstance* lpTTInstance,
                                   IN TTBOOL bEncrypted)
 {
     return TT_ConnectSysID(lpTTInstance, szHostAddress, nTcpPort, nUdpPort,
-                           nLocalTcpPort, nLocalUdpPort, bEncrypted, (const TTCHAR*)L"teamtalk");
+                           nLocalTcpPort, nLocalUdpPort, bEncrypted, TTSTR("teamtalk"));
 }
 
 TEAMTALKDLL_API TTBOOL TT_ConnectSysID(IN TTInstance* lpTTInstance,
@@ -1420,7 +1427,7 @@ TEAMTALKDLL_API INT32 TT_DoLogin(IN TTInstance* lpTTInstance,
                                  IN const TTCHAR* szPassword)
 {
     return TT_DoLoginEx(lpTTInstance, szNickname, szUsername,
-                        szPassword, (const TTCHAR*)L"");
+                        szPassword, TTSTR(""));
 }
 
 TEAMTALKDLL_API INT32 TT_DoLoginEx(IN TTInstance* lpTTInstance,
@@ -1777,9 +1784,9 @@ TEAMTALKDLL_API TTBOOL TT_SetUserMediaStorageDirEx(IN TTInstance* lpTTInstance,
     if (user)
     {
         if(szFolderPath == nullptr)
-            szFolderPath = L"";
+            szFolderPath = TTSTR("");
         if(szFileNameVars == nullptr)
-            szFileNameVars = L"";
+            szFileNameVars = TTSTR("");
 
         user->SetAudioFolder(TT2A(szFolderPath));
         user->SetAudioFileVariables(TT2A(szFileNameVars));

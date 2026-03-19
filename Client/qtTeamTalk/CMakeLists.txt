@@ -245,6 +245,10 @@ endif()
       endif()
     endif()
 
+    if (BUILD_TEAMTALK_CLIENT_TOLK)
+      set_property(TARGET ${TEAMTALK_TARGET} PROPERTY AUTOGEN_TARGET_DEPENDS tolk-src)
+    endif()
+
     if (BUILD_TEAMTALK_LIBRARY_DLL)
       target_include_directories (${TEAMTALK_TARGET} PUBLIC ./)
       target_link_libraries (${TEAMTALK_TARGET} ${TEAMTALK_LINK_FLAGS} TeamTalk5DLL)
