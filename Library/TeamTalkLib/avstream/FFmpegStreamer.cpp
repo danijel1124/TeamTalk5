@@ -287,7 +287,7 @@ void FFmpegStreamer::Run()
     if(!SetupInput(in_fmt, options, fmt_ctx, aud_dec_ctx, vid_dec_ctx,
                    audio_stream_index, video_stream_index))
     {
-        MYTRACE("Failed to setup input: %s\n", m_media_in.filename.c_str());
+        fprintf(stderr, "[TT-DEBUG] SetupInput FAILED\n");
         m_open.set(false);
         goto end;
     }
@@ -312,6 +312,7 @@ void FFmpegStreamer::Run()
 
         if(audio_filter_graph == nullptr)
         {
+            fprintf(stderr, "[TT-DEBUG] CreateAudioFilterGraph returned nullptr\n");
             m_open.set(false);
             goto end;
         }
@@ -754,40 +755,103 @@ AVFilterGraph* CreateAudioFilterGraph(AVFormatContext *fmt_ctx,
     out_channel_layouts[0] = (out_channels == 1 ? AV_CH_LAYOUT_MONO : AV_CH_LAYOUT_STEREO);
 
     filter_graph = avfilter_graph_alloc();
+    fprintf(stderr, "[TT-DEBUG] CreateAudioFilterGraph entry: ch=%d sr=%d\n", out_channels, out_samplerate);
 
     /* buffer audio source: the decoded frames from the decoder will be inserted here. */
+#if LIBAVUTIL_VERSION_MAJOR >= 58  /* FFmpeg 6.x+: use av_buffersrc_parameters_set, avoid args string */
     if (!av_channel_layout_check(&aud_dec_ctx->ch_layout))
         av_channel_layout_default(&aud_dec_ctx->ch_layout, aud_dec_ctx->ch_layout.nb_channels);
-
-    char ch_layout_str[64];
-    av_channel_layout_describe(&aud_dec_ctx->ch_layout, ch_layout_str, sizeof(ch_layout_str));
+    aud_buffersrc_ctx = avfilter_graph_alloc_filter(filter_graph, abuffersrc, "in");
+    if (!aud_buffersrc_ctx) {
+        fprintf(stderr, "[TT-DEBUG] Cannot allocate audio buffer source\n");
+        MYTRACE(ACE_TEXT("Cannot allocate audio buffer source\n"));
+        ret = AVERROR(ENOMEM);
+        goto error;
+    }
+    {
+        AVBufferSrcParameters *par = av_buffersrc_parameters_alloc();
+        if (!par) { ret = AVERROR(ENOMEM); goto error; }
+        par->format      = aud_dec_ctx->sample_fmt;
+        par->sample_rate = aud_dec_ctx->sample_rate;
+        par->time_base   = time_base;
+        av_channel_layout_copy(&par->ch_layout, &aud_dec_ctx->ch_layout);
+        ret = av_buffersrc_parameters_set(aud_buffersrc_ctx, par);
+        av_free(par);
+        if (ret < 0) {
+            fprintf(stderr, "[TT-DEBUG] Cannot set buffer source params, ret=%d\n", ret);
+            MYTRACE(ACE_TEXT("Cannot set buffer source params\n"));
+            goto error;
+        }
+    }
+    ret = avfilter_init_str(aud_buffersrc_ctx, nullptr);
+    if (ret < 0) {
+        fprintf(stderr, "[TT-DEBUG] Cannot init audio buffer source, ret=%d\n", ret);
+        MYTRACE(ACE_TEXT("Cannot init audio buffer source\n"));
+        goto error;
+    }
+#else
+    if (aud_dec_ctx->channel_layout == 0u)
+        aud_dec_ctx->channel_layout = av_get_default_channel_layout(aud_dec_ctx->channels);
     snprintf(args, sizeof(args),
-             "time_base=%d/%d:sample_rate=%d:sample_fmt=%s:channel_layout=%s",
+             "time_base=%d/%d:sample_rate=%d:sample_fmt=%s:channel_layout=0x%x",
              time_base.num, time_base.den, aud_dec_ctx->sample_rate,
-             av_get_sample_fmt_name(aud_dec_ctx->sample_fmt), ch_layout_str);
-
+             av_get_sample_fmt_name(aud_dec_ctx->sample_fmt),
+             (unsigned)aud_dec_ctx->channel_layout);
     ret = avfilter_graph_create_filter(&aud_buffersrc_ctx, abuffersrc, "in",
                                        args, nullptr, filter_graph);
     if (ret < 0) {
+        fprintf(stderr, "[TT-DEBUG] Cannot create audio buffer source, ret=%d\n", ret);
         MYTRACE(ACE_TEXT("Cannot create audio buffer source\n"));
         goto error;
     }
+#endif
 
     /* buffer audio sink: to terminate the filter chain. */
+#if LIBAVUTIL_VERSION_MAJOR >= 58  /* FFmpeg 6.x: avfilter_graph_create_filter initializes immediately, options must be set before init */
+    aud_buffersink_ctx = avfilter_graph_alloc_filter(filter_graph, abuffersink, "out");
+    if (!aud_buffersink_ctx) {
+        ret = AVERROR(ENOMEM);
+        fprintf(stderr, "[TT-DEBUG] Cannot allocate audio buffer sink\n");
+        goto error;
+    }
+    ret = av_opt_set_int_list(aud_buffersink_ctx, "sample_fmts", OUT_SAMPLE_FMTS, -1,
+                              AV_OPT_SEARCH_CHILDREN);
+    if (ret < 0) {
+        fprintf(stderr, "[TT-DEBUG] Failed to set output sample_fmts, ret=%d\n", ret);
+        goto error;
+    }
+    ret = av_opt_set(aud_buffersink_ctx, "ch_layouts",
+                     (out_channels == 1 ? "mono" : "stereo"),
+                     AV_OPT_SEARCH_CHILDREN);
+    if (ret < 0) {
+        fprintf(stderr, "[TT-DEBUG] Failed to set ch_layouts, ret=%d\n", ret);
+        goto error;
+    }
+    ret = av_opt_set_int_list(aud_buffersink_ctx, "sample_rates", out_sample_rates, -1,
+                              AV_OPT_SEARCH_CHILDREN);
+    if (ret < 0) {
+        fprintf(stderr, "[TT-DEBUG] Failed to set sample_rates, ret=%d\n", ret);
+        goto error;
+    }
+    ret = avfilter_init_str(aud_buffersink_ctx, nullptr);
+    if (ret < 0) {
+        fprintf(stderr, "[TT-DEBUG] Cannot init audio buffer sink, ret=%d\n", ret);
+        goto error;
+    }
+    fprintf(stderr, "[TT-DEBUG] abuffersink init OK\n");
+#else
     ret = avfilter_graph_create_filter(&aud_buffersink_ctx, abuffersink, "out",
                                        nullptr, nullptr, filter_graph);
     if (ret < 0) {
         MYTRACE(ACE_TEXT("Cannot create audio buffer sink\n"));
         goto error;
     }
-
     ret = av_opt_set_int_list(aud_buffersink_ctx, "sample_fmts", OUT_SAMPLE_FMTS, -1,
                               AV_OPT_SEARCH_CHILDREN);
     if (ret < 0) {
         MYTRACE(ACE_TEXT("Failed to set output sample fmt\n"));
         goto error;
     }
-
     ret = av_opt_set_int_list(aud_buffersink_ctx, "channel_layouts", out_channel_layouts, -1,
                               AV_OPT_SEARCH_CHILDREN);
     if (ret < 0) {
@@ -800,6 +864,7 @@ AVFilterGraph* CreateAudioFilterGraph(AVFormatContext *fmt_ctx,
         MYTRACE(ACE_TEXT("Cannot set output sample rate\n"));
         goto error;
     }
+#endif
 
     /* Endpoints for the filter graph. */
     outputs->name       = av_strdup("in");
@@ -812,19 +877,25 @@ AVFilterGraph* CreateAudioFilterGraph(AVFormatContext *fmt_ctx,
     inputs->pad_idx    = 0;
     inputs->next       = nullptr;
 
+    /* aformat filter uses "channel_layouts=" in all FFmpeg versions (string value works everywhere) */
     snprintf(filter_descr, sizeof(filter_descr),
              "aresample=%d,aformat=sample_fmts=s16:channel_layouts=%s",
              out_samplerate, (out_channels == 2?"stereo":"mono"));
 
+    fprintf(stderr, "[TT-DEBUG] avfilter_graph_parse: %s\n", filter_descr);
     if ((ret = avfilter_graph_parse(filter_graph, filter_descr,
                                     inputs, outputs, nullptr)) < 0)
     {
-        MYTRACE(ACE_TEXT("Failed to parse graph\n"));
+        fprintf(stderr, "[TT-DEBUG] avfilter_graph_parse failed, ret=%d\n", ret);
         goto error;
     }
 
     if ((ret = avfilter_graph_config(filter_graph, nullptr)) < 0)
+    {
+        fprintf(stderr, "[TT-DEBUG] avfilter_graph_config failed, ret=%d\n", ret);
         goto error;
+    }
+    fprintf(stderr, "[TT-DEBUG] CreateAudioFilterGraph SUCCESS\n");
 
     /* Print summary of the sink buffer
      * Note: args buffer is reused to store channel layout string */

@@ -19,6 +19,37 @@
 #include "license.h"
 #include "appinfo.h"
 
+#include <QDateTime>
+#include <QFile>
+#include <QLoggingCategory>
+#include <QMutex>
+#include <QTextStream>
+
+static QFile* s_logFile = nullptr;
+static QMutex s_logMutex;
+
+static void ttLogHandler(QtMsgType type, const QMessageLogContext& /*ctx*/, const QString& msg)
+{
+    QMutexLocker lock(&s_logMutex);
+    if (!s_logFile || !s_logFile->isOpen())
+        return;
+
+    const char* level;
+    switch (type) {
+    case QtDebugMsg:    level = "DEBUG"; break;
+    case QtInfoMsg:     level = "INFO "; break;
+    case QtWarningMsg:  level = "WARN "; break;
+    case QtCriticalMsg: level = "ERROR"; break;
+    case QtFatalMsg:    level = "FATAL"; break;
+    default:            level = "?    "; break;
+    }
+
+    QTextStream out(s_logFile);
+    out << QDateTime::currentDateTime().toString("hh:mm:ss.zzz")
+        << " [" << level << "] " << msg << "\n";
+    out.flush();
+}
+
 // The host rcc (Linux) emits a reference to qResourceFeatureZstd() for
 // non-ELF targets (Windows PE), but the Windows Qt6Core may not export it
 // when built without zstd. Provide a stub that signals "no zstd".
@@ -41,6 +72,10 @@ unsigned char qResourceFeatureZstd() { return 0; }
 
 #if defined(Q_OS_WIN32)
 #include <windows.h>
+#endif
+
+#if defined(Q_OS_LINUX) || defined(Q_OS_DARWIN)
+#include <unistd.h>
 #endif
 
 
@@ -196,7 +231,7 @@ OSStatus mac_callback(EventHandlerCallRef nextHandler, EventRef event, void*);
 class MyQApplication : public QApplication
 {
 public:
-    MyQApplication(int& argc, char **argv) 
+    MyQApplication(int& argc, char **argv)
         : QApplication(argc, argv), m_mainwindow(nullptr)
     {
         EventTypeSpec hkEvents[2];
@@ -224,8 +259,8 @@ public:
                kind == kEventHotKeyReleased)
             {
                 EventHotKeyID keyID;
-                GetEventParameter(event, kEventParamDirectObject, 
-                                  typeEventHotKeyID, 
+                GetEventParameter(event, kEventParamDirectObject,
+                                  typeEventHotKeyID,
                                   nullptr, sizeof(keyID), nullptr, &keyID);
                 m_mainwindow->hotkeyToggle((HotKeyID)keyID.id, kind == kEventHotKeyPressed);
             }
@@ -311,6 +346,26 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
 #endif
 
+    s_logFile = new QFile(QCoreApplication::applicationDirPath() + "/teamtalk5-beta.log");
+    s_logFile->open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text);
+#if defined(Q_OS_LINUX) || defined(Q_OS_DARWIN)
+    if (s_logFile->handle() >= 0)
+        dup2(s_logFile->handle(), STDERR_FILENO);
+#endif
+    qInstallMessageHandler(ttLogHandler);
+    QLoggingCategory::setFilterRules(
+        "*.debug=true\n"
+        "qt.accessibility.*=false\n"
+        "qt.widgets.*=false\n"
+        "qt.gui.*=false\n"
+        "qt.xcb.*=false\n"
+        "qt.qpa.*=false\n"
+        "qt.text.*=false\n"
+        "qt.multimedia.*=false\n"
+        "qt.network.ssl=false\n"
+    );
+    qInfo() << "=== TeamTalk" << APPVERSION_SHORT << "started ===";
+
     QString cfgfile;
     int idx = QApplication::arguments().indexOf("-cfg");
     if(idx >= 0 && ++idx < QApplication::arguments().size())
@@ -331,7 +386,7 @@ int main(int argc, char* argv[])
 #else
     ttInst = TT_InitTeamTalkPoll();
 #endif
-    
+
     window.loadSettings(); //load settings now that we have ttInst
 
     window.show();

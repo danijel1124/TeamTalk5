@@ -16,6 +16,7 @@
  */
 
 #include "mainwindow.h"
+#include <QDebug>
 #include "serverlistdlg.h"
 #include "serverpropertiesdlg.h"
 #include "preferencesdlg.h"
@@ -1691,15 +1692,19 @@ void MainWindow::processTTMessage(const TTMessage& msg)
     switch (msg.nClientEvent)
     {
     case CLIENTEVENT_CON_SUCCESS :
+        qDebug() << "Event: CON_SUCCESS";
         clienteventConSuccess();
     break;
     case CLIENTEVENT_CON_FAILED :
+        qDebug() << "Event: CON_FAILED";
         clienteventConFailed();
     break;
     case CLIENTEVENT_CON_CRYPT_ERROR :
+        qDebug() << "Event: CON_CRYPT_ERROR";
         clienteventConCryptError(msg);
     break;
     case CLIENTEVENT_CON_LOST :
+        qDebug() << "Event: CON_LOST";
         clienteventConLost();
     break;
     case CLIENTEVENT_CON_MAX_PAYLOAD_UPDATED :
@@ -1728,18 +1733,22 @@ void MainWindow::processTTMessage(const TTMessage& msg)
         emit cmdSuccess(msg.nSource);
     break;
     case CLIENTEVENT_CMD_MYSELF_LOGGEDIN :
+        qDebug() << "Event: MYSELF_LOGGEDIN username=" << _Q(msg.useraccount.szUsername);
         //store user account settings
         m_myuseraccount = msg.useraccount;
         updateTabPages();
         break;
     case CLIENTEVENT_CMD_MYSELF_LOGGEDOUT :
+        qDebug() << "Event: MYSELF_LOGGEDOUT";
         disconnectFromServer();
         break;
     case CLIENTEVENT_CMD_MYSELF_KICKED :
+        qDebug() << "Event: MYSELF_KICKED by user#" << msg.nSource;
         clienteventMyselfKicked(msg);
     break;
     case CLIENTEVENT_CMD_SERVER_UPDATE :
         Q_ASSERT(msg.ttType == __SERVERPROPERTIES);
+        qDebug() << "Event: SERVER_UPDATE name=" << _Q(msg.serverproperties.szServerName);
         emit serverUpdate(msg.serverproperties);
         m_srvprop = msg.serverproperties;
         clienteventCmdServerUpdate(msg.serverproperties);
@@ -1750,30 +1759,37 @@ void MainWindow::processTTMessage(const TTMessage& msg)
     break;
     case CLIENTEVENT_CMD_CHANNEL_NEW :
         Q_ASSERT(msg.ttType == __CHANNEL);
+        qDebug() << "Event: CHANNEL_NEW" << _Q(msg.channel.szName) << "id=" << msg.channel.nChannelID;
         emit newChannel(msg.channel);
         break;
     case CLIENTEVENT_CMD_CHANNEL_UPDATE :
         Q_ASSERT(msg.ttType == __CHANNEL);
+        qDebug() << "Event: CHANNEL_UPDATE" << _Q(msg.channel.szName) << "id=" << msg.channel.nChannelID;
         clienteventCmdChannelUpdate(msg.channel);
     break;
     case CLIENTEVENT_CMD_CHANNEL_REMOVE :
         Q_ASSERT(msg.ttType == __CHANNEL);
+        qDebug() << "Event: CHANNEL_REMOVE id=" << msg.channel.nChannelID;
         emit removeChannel(msg.channel);
         break;
     case CLIENTEVENT_CMD_USER_LOGGEDIN :
         Q_ASSERT(msg.ttType == __USER);
+        qDebug() << "Event: USER_LOGGEDIN" << _Q(msg.user.szNickname) << "id=" << msg.user.nUserID;
         clienteventCmdUserLoggedIn(msg.user);
     break;
     case CLIENTEVENT_CMD_USER_LOGGEDOUT :
         Q_ASSERT(msg.ttType == __USER);
+        qDebug() << "Event: USER_LOGGEDOUT" << _Q(msg.user.szNickname) << "id=" << msg.user.nUserID;
         clienteventCmdUserLoggedOut(msg.user);
     break;
     case CLIENTEVENT_CMD_USER_JOINED :
         Q_ASSERT(msg.ttType == __USER);
+        qDebug() << "Event: USER_JOINED" << _Q(msg.user.szNickname) << "channel=" << msg.user.nChannelID;
         clienteventCmdUserJoined(msg.user);
         break;
     case CLIENTEVENT_CMD_USER_LEFT :
         Q_ASSERT(msg.ttType == __USER);
+        qDebug() << "Event: USER_LEFT" << _Q(msg.user.szNickname) << "channel=" << msg.nSource;
         clienteventCmdUserLeft(msg.nSource, msg.user);
         break;
     case CLIENTEVENT_CMD_USER_UPDATE :
@@ -1783,6 +1799,7 @@ void MainWindow::processTTMessage(const TTMessage& msg)
     case CLIENTEVENT_CMD_USER_TEXTMSG :
     {
         Q_ASSERT(msg.ttType == __TEXTMESSAGE);
+        qDebug() << "Event: USER_TEXTMSG from=" << _Q(msg.textmessage.szFromUsername) << "type=" << msg.textmessage.nMsgType;
         MyTextMessage mymsg = m_textmessages.addTextMessage(msg.textmessage);
         if (mymsg.nMsgType != MSGTYPE_NONE)
             processTextMessage(mymsg);
@@ -2710,7 +2727,9 @@ void MainWindow::changeEvent(QEvent* event )
                 //(Qt is weird! Seems it doesn't distinguish 'closed' and 'hidden')
                 QApplication::setQuitOnLastWindowClosed(false);
                 m_sysicon->show();
-
+#if defined(Q_OS_WIN) && !defined(_MSC_VER)
+                setNotificationTrayIcon(m_sysicon);
+#endif
                 QTimer::singleShot(0, this, &MainWindow::hide);
             }
             else if(m_sysicon)
@@ -5567,8 +5586,36 @@ void MainWindow::startStreamMediaFile()
     m_mfp.audioPreprocessor = loadAudioPreprocessor(apt);
     m_mfp.bPaused = false;
     m_mfp.uOffsetMSec = ttSettings->value(SETTINGS_STREAMMEDIA_OFFSET, SETTINGS_STREAMMEDIA_OFFSET_DEFAULT).toUInt();
+    {
+        MediaFileInfo mfi = {};
+        bool fileOk = TT_GetMediaFileInfo(_W(fileName), &mfi);
+        qDebug() << "startStreamMediaFile: TT_GetMediaFileInfo=" << fileOk
+                 << "samplerate=" << mfi.audioFmt.nSampleRate
+                 << "channels=" << mfi.audioFmt.nChannels
+                 << "duration_ms=" << mfi.uDurationMSec;
+    }
+    INT32 myRights = 0;
+    {
+        ServerProperties sp = {};
+        TT_GetServerProperties(ttInst, &sp);
+        UserAccount ua = {};
+        TT_GetMyUserAccount(ttInst, &ua);
+        myRights = ua.uUserRights;
+        qDebug() << "startStreamMediaFile: userRights=0x" << QString::number(myRights, 16)
+                 << "TRANSMIT_MEDIAFILE_AUDIO=" << bool(myRights & USERRIGHT_TRANSMIT_MEDIAFILE_AUDIO);
+    }
+    {
+        INT32 flags = TT_GetFlags(ttInst);
+        qDebug() << "startStreamMediaFile: clientFlags=0x" << QString::number(flags, 16)
+                 << "myChannelID=" << TT_GetMyChannelID(ttInst)
+                 << "STREAM_AUDIO=" << bool(flags & CLIENT_STREAM_AUDIO);
+    }
+    qDebug() << "startStreamMediaFile: file=" << fileName
+             << "offset=" << m_mfp.uOffsetMSec
+             << "codec=" << m_mfp_videocodec.nCodec;
     if (!TT_StartStreamingMediaFileToChannelEx(ttInst, _W(fileName), &m_mfp, &m_mfp_videocodec))
     {
+        qDebug() << "startStreamMediaFile: TT_StartStreamingMediaFileToChannelEx FAILED for" << fileName;
         QMessageBox::information(this,
                                  MENUTEXT(ui.actionStreamMediaFileToChannel->text()),
                                  QString(tr("Failed to stream media file %1").arg(fileName)));
@@ -5576,6 +5623,7 @@ void MainWindow::startStreamMediaFile()
     }
     else
     {
+        qDebug() << "startStreamMediaFile: OK";
         QString statusmsg = ttSettings->value(SETTINGS_GENERAL_STATUSMESSAGE, SETTINGS_GENERAL_STATUSMESSAGE_DEFAULT).toString();
         if ((TT_GetFlags(ttInst) & CLIENT_AUTHORIZED) && m_host.statusmsg.size())
             statusmsg = m_host.statusmsg;

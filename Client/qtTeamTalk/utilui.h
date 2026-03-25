@@ -251,4 +251,8 @@ private:
 };
 
     void showNotification(const QString &title, const QString &message);
+#if defined(Q_OS_WIN) && !defined(_MSC_VER)
+#include <QSystemTrayIcon>
+    void setNotificationTrayIcon(QSystemTrayIcon* icon);
+#endif
 #endif

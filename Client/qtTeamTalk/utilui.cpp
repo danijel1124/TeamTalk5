@@ -16,6 +16,7 @@
  */
 
 #include "utilui.h"
+#include <QDebug>
 #include "settings.h"
 #include "bearwarelogindlg.h"
 #include "appinfo.h"
@@ -831,6 +832,7 @@ public:
 
 void showNotification(const QString &title, const QString &message)
 {
+    qDebug() << "showNotification (WinToast):" << title << "|" << message;
     WinToast::instance()->setAppName(stringToWString(APPNAME_SHORT));
     WinToast::instance()->setAppUserModelId(WinToast::configureAUMI(
         stringToWString(COMPANYNAME),
@@ -851,12 +853,31 @@ void showNotification(const QString &title, const QString &message)
     }
 }
 #elif defined(Q_OS_WIN)
-void showNotification(const QString& /*title*/, const QString& /*message*/)
+// MinGW: WinToast (WinRT) not available — use QSystemTrayIcon balloon instead
+#include <QSystemTrayIcon>
+#include <QIcon>
+static QSystemTrayIcon* s_notifyIcon = nullptr;
+
+void setNotificationTrayIcon(QSystemTrayIcon* icon)
 {
+    s_notifyIcon = icon;
+}
+
+void showNotification(const QString &title, const QString &message)
+{
+    qDebug() << "showNotification (MinGW/TrayIcon):" << title << "|" << message;
+    // Use the registered tray icon if available; otherwise create a dedicated one
+    if (!s_notifyIcon)
+    {
+        s_notifyIcon = new QSystemTrayIcon(QIcon(APPTRAYICON));
+        s_notifyIcon->show();
+    }
+    s_notifyIcon->showMessage(title, message, QSystemTrayIcon::Information, 5000);
 }
 #elif defined(Q_OS_LINUX)
 void showNotification(const QString &title, const QString &message)
 {
+    qDebug() << "showNotification (Linux/notify-send):" << title << "|" << message;
     QStringList arguments;
     arguments << "-t" << "5000"
               << "-a" << APPNAME_SHORT

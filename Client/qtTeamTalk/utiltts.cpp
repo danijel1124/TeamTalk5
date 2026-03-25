@@ -16,6 +16,7 @@
  */
 
 #include "utiltts.h"
+#include <QDebug>
 #include "settings.h"
 #include "common.h"
 #include "appinfo.h"
@@ -89,6 +90,7 @@ QHash<TTSEvents, TTSEventInfo> UtilTTS::eventToSettingMap()
 
 void addTextToSpeechMessage(const QString& msg)
 {
+    qDebug() << "TTS message:" << msg;
     switch (ttSettings->value(SETTINGS_TTS_ENGINE, SETTINGS_TTS_ENGINE_DEFAULT).toUInt())
     {
     case TTSENGINE_QT:
@@ -101,17 +103,27 @@ void addTextToSpeechMessage(const QString& msg)
 #if defined(ENABLE_TOLK)
         Tolk_PreferSAPI(ttSettings->value(SETTINGS_TTS_SAPI, SETTINGS_TTS_SAPI_DEFAULT).toBool());
         Tolk_TrySAPI(ttSettings->value(SETTINGS_TTS_TRY_SAPI, SETTINGS_TTS_TRY_SAPI_DEFAULT).toBool());
-        switch (ttSettings->value(SETTINGS_TTS_OUTPUT_MODE, SETTINGS_TTS_OUTPUT_MODE_DEFAULT).toInt())
         {
-            case TTS_OUTPUTMODE_BRAILLE:
-                Tolk_Braille(_W(msg));
-                break;
-            case TTS_OUTPUTMODE_SPEECH:
-                Tolk_Speak(_W(msg));
-                break;
-            case TTS_OUTPUTMODE_SPEECHBRAILLE:
-                Tolk_Output(_W(msg));
-                break;
+            int outputMode = ttSettings->value(SETTINGS_TTS_OUTPUT_MODE, SETTINGS_TTS_OUTPUT_MODE_DEFAULT).toInt();
+            qDebug() << "Tolk output mode:" << outputMode;
+            switch (outputMode)
+            {
+                case TTS_OUTPUTMODE_BRAILLE:
+                    qDebug() << "Tolk: Braille";
+                    Tolk_Braille(_W(msg));
+                    break;
+                case TTS_OUTPUTMODE_SPEECH:
+                    qDebug() << "Tolk: Speak";
+                    Tolk_Speak(_W(msg));
+                    break;
+                case TTS_OUTPUTMODE_SPEECHBRAILLE:
+                    qDebug() << "Tolk: Output (speech+braille)";
+                    Tolk_Output(_W(msg));
+                    break;
+                default:
+                    qDebug() << "Tolk: unknown output mode, nothing sent";
+                    break;
+            }
         }
 #endif
         break;
@@ -159,9 +171,13 @@ bool isScreenReaderActive()
     bool SRActive = false;
 #if defined(ENABLE_TOLK)
     bool tolkLoaded = Tolk_IsLoaded();
+    qDebug() << "Tolk: isScreenReaderActive() — isLoaded=" << tolkLoaded;
     if (!tolkLoaded)
         Tolk_Load();
-    SRActive = Tolk_DetectScreenReader() != nullptr;
+    const wchar_t* sr = Tolk_DetectScreenReader();
+    qDebug() << "Tolk: DetectScreenReader =" << (sr ? QString::fromWCharArray(sr) : QStringLiteral("(none)"));
+    qDebug() << "Tolk: HasSpeech=" << Tolk_HasSpeech() << "HasBraille=" << Tolk_HasBraille();
+    SRActive = sr != nullptr;
     if (!tolkLoaded)
         Tolk_Unload();
 #elif defined(Q_OS_LINUX)
